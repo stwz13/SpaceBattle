@@ -1,0 +1,61 @@
+name: CI (PR only)
+
+on:
+  pull_request:
+    branches: ['**']
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        run: dotnet restore SpaceBattle/SpaceBattle.slnx
+
+      - name: Build
+        run: dotnet build SpaceBattle/SpaceBattle.slnx --configuration Release --no-restore
+
+      - name: Test with coverage
+        run: |
+          dotnet test ./SpaceBattle/SpaceBattle.Tests/SpaceBattle.Tests.csproj \
+            --configuration Release \
+            --no-build \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./coverage \
+            --verbosity normal
+
+      - name: Code Coverage Summary
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: "coverage/**/coverage.cobertura.xml"
+          badge: true
+          format: "markdown"
+          output: "both"
+          thresholds: "70 90"
+
+      - name: Add Coverage Comment to PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          recreate: true
+          path: code-coverage-results.md
+          header: code-coverage
+          
