@@ -4,21 +4,18 @@ public class Angle
 {
     public static readonly int Denominator = 8;
 
-    private int _numerator;
-    private readonly IAngleFactory _factory;
-    public int Numerator { get { return _numerator; } }
+    public int Numerator { get; }
     public double Radians { get; }
 
-    public Angle(int numerator, IAngleFactory factory)
+    public Angle(int numerator)
     {
-        _numerator = (numerator % Denominator + Denominator) % Denominator;
-        _factory = factory;
+        Numerator = (numerator % Denominator + Denominator) % Denominator;
         Radians = 2 * Math.PI * Numerator / Denominator;
     }
 
     public static Angle operator +(Angle a, Angle b)
     {
-        return a._factory.Add(a, b);
+        return new Angle(a.Numerator + b.Numerator);
     }
 
 

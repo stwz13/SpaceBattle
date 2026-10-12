@@ -10,16 +10,25 @@ public static class GeneratedNames
 
     public static string Mangle(Type type) => type.FullName!.Replace('.', '_').Replace('+', '_');
 
-    public static string AdapterClass(Type iface) => Mangle(iface) + "Adapter";
+    public static string Identifier(string prefix, Type type, string suffix = "") =>
+        (string.IsNullOrEmpty(prefix) ? "" : prefix + "_") + Mangle(type) + suffix;
 
-    public static string AdapterDependency(Type iface) => "Adapters." + AdapterClass(iface);
+    public static string DependencyKey(string category, Type type, string suffix = "") =>
+        DependencyKey(category, Mangle(type) + suffix);
 
-    public static string CommandDependency(Type command) => "Commands." + Mangle(command);
+    public static string DependencyKey(string category, params string[] components) =>
+        string.Join(".", components.Prepend(category));
 
-    public static string AdapterMethod(Type iface) => "Adapter_" + AdapterClass(iface);
+    public static string AdapterClass(Type iface) => Identifier("", iface, "Adapter");
 
-    public static string CommandMethod(Type command) => "Command_" + Mangle(command);
+    public static string AdapterDependency(Type iface) => DependencyKey(DependencyNamespaces.Adapters, iface, "Adapter");
+
+    public static string CommandDependency(Type command) => DependencyKey(DependencyNamespaces.Commands, command);
+
+    public static string AdapterMethod(Type iface) => Identifier("Adapter", iface, "Adapter");
+
+    public static string CommandMethod(Type command) => Identifier("Command", command);
 
     public static string PropertyDependency(Type view, PropertyInfo property) =>
-        $"Properties.{Mangle(view)}.{Mangle(property.DeclaringType!)}.{property.Name}";
+        DependencyKey(DependencyNamespaces.Properties, Mangle(view), Mangle(property.DeclaringType!), property.Name);
 }

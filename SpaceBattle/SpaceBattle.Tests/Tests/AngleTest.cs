@@ -3,10 +3,28 @@ namespace SpaceBattle.Tests;
 using SpaceBattle.Lib;
 public class AngleTest
 {
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(7, 7)]
+    [InlineData(8, 0)]
+    [InlineData(15, 7)]
+    [InlineData(-1, 7)]
+    [InlineData(-8, 0)]
+    [InlineData(-9, 7)]
+    [InlineData(int.MinValue, 0)]
+    [InlineData(int.MaxValue, 7)]
+    public void Constructor_Normalizes_Positive_And_Negative_Turns(int numerator, int expected)
+    {
+        var angle = new Angle(numerator);
+
+        Assert.Equal(expected, angle.Numerator);
+        Assert.Equal(2 * Math.PI * expected / Angle.Denominator, angle.Radians);
+    }
+
     [Fact]
     public void TestAngleCreationReturnsCorrectAngle()
     {
-        var a = SpaceBattle.Tests.TestValues.Angle(5);
+        var a = new Angle(5);
 
         Assert.Equal(5, a.Numerator);
         Assert.Equal(8, Angle.Denominator);
@@ -15,10 +33,10 @@ public class AngleTest
     [Fact]
     public void TestAnglesAdditionReturnsCorrectAngle()
     {
-        var a = SpaceBattle.Tests.TestValues.Angle(5);
-        var b = SpaceBattle.Tests.TestValues.Angle(7);
+        var a = new Angle(5);
+        var b = new Angle(7);
 
-        var c = SpaceBattle.Tests.TestValues.Angle(4);
+        var c = new Angle(4);
 
         Assert.Equal(c, a + b);
     }
@@ -26,8 +44,8 @@ public class AngleTest
     [Fact]
     public void TestAnglesWithIntDifferenceOfTurnsAreEqualWithEqualsMethod()
     {
-        var a = SpaceBattle.Tests.TestValues.Angle(15);
-        var b = SpaceBattle.Tests.TestValues.Angle(23);
+        var a = new Angle(15);
+        var b = new Angle(23);
 
         Assert.True(a.Equals(b));
         Assert.True(b.Equals(a));
@@ -36,8 +54,8 @@ public class AngleTest
     [Fact]
     public void TestAnglesWithIntDifferenceOfTurnsAreEqualWithOverloadedEqualsMethod()
     {
-        var a = SpaceBattle.Tests.TestValues.Angle(15);
-        var b = SpaceBattle.Tests.TestValues.Angle(23);
+        var a = new Angle(15);
+        var b = new Angle(23);
 
         Assert.True(a == b);
         Assert.True(b == a);
@@ -46,8 +64,8 @@ public class AngleTest
     [Fact]
     public void TestDifferentAnglesAreNotEqualWithEqualsMethod()
     {
-        var a = SpaceBattle.Tests.TestValues.Angle(1);
-        var b = SpaceBattle.Tests.TestValues.Angle(2);
+        var a = new Angle(1);
+        var b = new Angle(2);
 
         Assert.False(a.Equals(b));
         Assert.False(b.Equals(a));
@@ -56,7 +74,7 @@ public class AngleTest
     [Fact]
     public void TestAngleAndNotAngleAreNotEqual()
     {
-        var a = SpaceBattle.Tests.TestValues.Angle(5);
+        var a = new Angle(5);
         var b = 5 / Angle.Denominator;
 
         Assert.False(a.Equals(b));
@@ -66,8 +84,8 @@ public class AngleTest
     [Fact]
     public void TestDifferentAnglesAreNotEqualWithOverloadedEqualsMethod()
     {
-        var a = SpaceBattle.Tests.TestValues.Angle(1);
-        var b = SpaceBattle.Tests.TestValues.Angle(2);
+        var a = new Angle(1);
+        var b = new Angle(2);
 
         Assert.True(a != b);
         Assert.True(b != a);
@@ -76,8 +94,8 @@ public class AngleTest
     [Fact]
     public void TestSameAnglesHaveSameHashCode()
     {
-        var a = SpaceBattle.Tests.TestValues.Angle(15);
-        var b = SpaceBattle.Tests.TestValues.Angle(23);
+        var a = new Angle(15);
+        var b = new Angle(23);
 
         Assert.Equal(a.GetHashCode(), b.GetHashCode());
     }
@@ -85,7 +103,7 @@ public class AngleTest
     [Fact]
     public void TestAngleSinСalculatedCorrectly()
     {
-        var a = SpaceBattle.Tests.TestValues.Angle(5);
+        var a = new Angle(5);
 
         Assert.Equal(-Math.Sqrt(2) / 2, Math.Sin(a.Radians), 10);
     }
@@ -93,7 +111,7 @@ public class AngleTest
     [Fact]
     public void TestAngleCosСalculatedCorrectly()
     {
-        var a = SpaceBattle.Tests.TestValues.Angle(5);
+        var a = new Angle(5);
 
         Assert.Equal(-Math.Sqrt(2) / 2, Math.Cos(a.Radians), 10);
     }
