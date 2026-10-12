@@ -8,13 +8,13 @@ public class RotateTest
     public void TestRotationChangesObjectDirectionCorrectly()
     {
         Mock<IRotating> rotating = new Mock<IRotating>();
-        rotating.SetupGet(a => a.Direction).Returns(SpaceBattle.Tests.TestValues.Angle(1));
-        rotating.SetupGet(a => a.AngularVelocity).Returns(SpaceBattle.Tests.TestValues.Angle(1));
+        rotating.SetupGet(a => a.Direction).Returns(new Angle(1));
+        rotating.SetupGet(a => a.AngularVelocity).Returns(new Angle(1));
 
         ICommand cmd = new RotateCommand(rotating.Object);
         cmd.Execute();
 
-        rotating.VerifySet(a => a.Direction = SpaceBattle.Tests.TestValues.Angle(2));
+        rotating.VerifySet(a => a.Direction = new Angle(2));
     }
 
     [Fact]
@@ -22,7 +22,7 @@ public class RotateTest
     {
         Mock<IRotating> rotating = new Mock<IRotating>();
         rotating.SetupGet(a => a.Direction).Throws<InvalidOperationException>();
-        rotating.SetupGet(a => a.AngularVelocity).Returns(SpaceBattle.Tests.TestValues.Angle(1));
+        rotating.SetupGet(a => a.AngularVelocity).Returns(new Angle(1));
 
         ICommand cmd = new RotateCommand(rotating.Object);
 
@@ -33,7 +33,7 @@ public class RotateTest
     public void TestRotationWithoutAngularVelocityThrowsException()
     {
         Mock<IRotating> rotating = new Mock<IRotating>();
-        rotating.SetupGet(a => a.Direction).Returns(SpaceBattle.Tests.TestValues.Angle(1));
+        rotating.SetupGet(a => a.Direction).Returns(new Angle(1));
         rotating.SetupGet(a => a.AngularVelocity).Throws<InvalidOperationException>();
 
         ICommand cmd = new RotateCommand(rotating.Object);
@@ -45,10 +45,10 @@ public class RotateTest
     public void TestImpossibleRotationThrowsException()
     {
         Mock<IRotating> rotating = new Mock<IRotating>();
-        rotating.SetupGet(a => a.Direction).Returns(SpaceBattle.Tests.TestValues.Angle(1));
-        rotating.SetupGet(a => a.AngularVelocity).Returns(SpaceBattle.Tests.TestValues.Angle(1));
+        rotating.SetupGet(a => a.Direction).Returns(new Angle(1));
+        rotating.SetupGet(a => a.AngularVelocity).Returns(new Angle(1));
 
-        rotating.SetupSet(a => a.Direction = SpaceBattle.Tests.TestValues.Angle(2)).Throws<InvalidOperationException>();
+        rotating.SetupSet(a => a.Direction = new Angle(2)).Throws<InvalidOperationException>();
 
         ICommand cmd = new RotateCommand(rotating.Object);
 

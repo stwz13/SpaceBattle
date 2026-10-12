@@ -7,26 +7,23 @@ namespace SpaceBattle.Tests;
 
 public class RotationActionTests
 {
-    private readonly IAngleFactory _angles;
 
     public RotationActionTests()
     {
         new InitCommand().Execute();
         Ioc.Resolve<App.ICommand>("IoC.Scope.Current.Set", Ioc.Resolve<object>("IoC.Scope.Create")).Execute();
-        new RegisterIoCDependencyValueFactories().Execute();
         new RegisterIoCDependencyCodeGeneration().Execute();
         new RegisterIoCDependencyGeneratedStrategies(typeof(RotateCommand).Assembly, Array.Empty<Dependency>()).Execute();
         new RegisterIoCDependencyMacroCommand().Execute();
         new RegisterIoCDependencyActionComposition().Execute();
         new RegisterIoCDependencyActionConfigurations(Path.Combine(AppContext.BaseDirectory, "Config")).Execute();
-        _angles = Ioc.Resolve<IAngleFactory>("Factories.Angle");
     }
 
     private TestGameItem Ship(int direction, int angularVelocity)
     {
         var ship = new TestGameItem();
-        ship.Properties["Direction"] = _angles.Create(direction);
-        ship.Properties["AngularVelocity"] = _angles.Create(angularVelocity);
+        ship.Properties["Direction"] = new Angle(direction);
+        ship.Properties["AngularVelocity"] = new Angle(angularVelocity);
         return ship;
     }
 
@@ -51,7 +48,7 @@ public class RotationActionTests
 
         Rotation(ship).Execute();
 
-        Assert.Equal(_angles.Create(expectedDirection), ship.Properties["Direction"]);
+        Assert.Equal(new Angle(expectedDirection), ship.Properties["Direction"]);
         Assert.Same(velocity, ship.Properties["AngularVelocity"]);
         Assert.Same(position, ship.Properties["Position"]);
     }
@@ -67,7 +64,7 @@ public class RotationActionTests
         Assert.IsType<MacroCommand>(command);
         Assert.Same(originalDirection, ship.Properties["Direction"]);
         command.Execute();
-        Assert.Equal(_angles.Create(3), ship.Properties["Direction"]);
+        Assert.Equal(new Angle(3), ship.Properties["Direction"]);
     }
 
     [Fact]
@@ -77,9 +74,9 @@ public class RotationActionTests
         var command = Rotation(ship);
 
         command.Execute();
-        Assert.Equal(_angles.Create(1), ship.Properties["Direction"]);
+        Assert.Equal(new Angle(1), ship.Properties["Direction"]);
         command.Execute();
-        Assert.Equal(_angles.Create(4), ship.Properties["Direction"]);
+        Assert.Equal(new Angle(4), ship.Properties["Direction"]);
     }
 
     [Fact]
@@ -93,7 +90,7 @@ public class RotationActionTests
 
         targetRotation.Execute();
 
-        Assert.Equal(_angles.Create(3), target.Properties["Direction"]);
+        Assert.Equal(new Angle(3), target.Properties["Direction"]);
         Assert.Same(otherDirection, other.Properties["Direction"]);
     }
 
@@ -133,19 +130,19 @@ public class RotationActionTests
     {
         var ship = Ship(2, 1);
         Rotation(ship).Execute();
-        Assert.Equal(_angles.Create(3), ship.Properties["Direction"]);
+        Assert.Equal(new Angle(3), ship.Properties["Direction"]);
         var parentScope = Ioc.Resolve<object>("IoC.Scope.Current");
         var property = typeof(IRotating).GetProperty(nameof(IRotating.AngularVelocity))!;
         var key = GeneratedNames.PropertyDependency(typeof(IRotating), property);
-        var velocity = _angles.Create(3);
+        var velocity = new Angle(3);
 
         Ioc.Resolve<App.ICommand>("IoC.Scope.Current.Set", Ioc.Resolve<object>("IoC.Scope.Create")).Execute();
         try
         {
             Ioc.Resolve<App.ICommand>("IoC.Register", key, (object[] args) => velocity).Execute();
             Rotation(ship).Execute();
-            Assert.Equal(_angles.Create(6), ship.Properties["Direction"]);
-            Assert.Equal(_angles.Create(1), ship.Properties["AngularVelocity"]);
+            Assert.Equal(new Angle(6), ship.Properties["Direction"]);
+            Assert.Equal(new Angle(1), ship.Properties["AngularVelocity"]);
         }
         finally
         {
@@ -153,7 +150,7 @@ public class RotationActionTests
         }
 
         Rotation(ship).Execute();
-        Assert.Equal(_angles.Create(7), ship.Properties["Direction"]);
+        Assert.Equal(new Angle(7), ship.Properties["Direction"]);
     }
 
     [Fact]
@@ -175,7 +172,7 @@ public class RotationActionTests
 
             Rotation(ship).Execute();
 
-            Assert.Equal(_angles.Create(3), ship.Properties["Direction"]);
+            Assert.Equal(new Angle(3), ship.Properties["Direction"]);
             Assert.Same(ship.Properties["Direction"], ship.Properties["DirectionAfterRotation"]);
         }
         finally
@@ -186,7 +183,7 @@ public class RotationActionTests
 
         var standardShip = Ship(1, 2);
         Rotation(standardShip).Execute();
-        Assert.Equal(_angles.Create(3), standardShip.Properties["Direction"]);
+        Assert.Equal(new Angle(3), standardShip.Properties["Direction"]);
         Assert.False(standardShip.Properties.ContainsKey("DirectionAfterRotation"));
     }
 }
