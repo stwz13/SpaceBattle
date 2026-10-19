@@ -2,12 +2,12 @@ namespace SpaceBattle.Lib;
 
 public class Vector
 {
-    public readonly int[] _coordinates;
+    public int[] Coordinates { get; }
 
     public Vector(params int[] coordinates)
     {
-        _coordinates = coordinates.ToArray();
-        Dim = _coordinates.Length;
+        Coordinates = coordinates.ToArray();
+        Dim = Coordinates.Length;
     }
 
     public int Dim { get; }
@@ -18,13 +18,13 @@ public class Vector
         {
             throw new ArgumentException("Vectors must have the same dimensions");
         }
-        return new Vector(v1._coordinates.Zip(v2._coordinates, (a, b) => a + b).ToArray());
+        return new Vector(v1.Coordinates.Zip(v2.Coordinates, (a, b) => a + b).ToArray());
     }
 
     public override bool Equals(object? obj)
     {
         if (obj is not Vector other) return false;
-        return _coordinates.SequenceEqual(other._coordinates);
+        return Coordinates.SequenceEqual(other.Coordinates);
     }
 
     public static bool operator ==(Vector? v1, Vector? v2) => Equals(v1, v2);
@@ -35,7 +35,7 @@ public class Vector
     {
         HashCode hash = default;
 
-        foreach (var coordinate in _coordinates)
+        foreach (var coordinate in Coordinates)
         {
             hash.Add(coordinate);
         }
