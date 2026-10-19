@@ -2,7 +2,7 @@ namespace SpaceBattle.Lib;
 
 public class Vector
 {
-    private readonly int[] _coordinates;
+    public readonly int[] _coordinates;
 
     public Vector(params int[] coordinates)
     {
