@@ -7,7 +7,7 @@ public class ShootCommand(IShooting shooting) : ICommand
         var ammo = shooting.Ammo;
         if (ammo <= 0)
         {
-            throw shooting.ExceptionFactory.InvalidOperation("Not enough ammunition to shoot.");
+            throw new InvalidOperationException("Not enough ammunition to shoot.");
         }
 
         var storage = shooting.Storage;
