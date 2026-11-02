@@ -6,6 +6,8 @@ public class GameQueue : IGameQueue
 
     public bool HasCommands => _commands.Count > 0;
 
+    public IReadOnlyCollection<ICommand> Pending => Array.AsReadOnly(_commands.ToArray());
+
     public void Enqueue(ICommand command)
     {
         ArgumentNullException.ThrowIfNull(command);
