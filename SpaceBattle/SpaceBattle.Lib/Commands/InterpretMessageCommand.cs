@@ -14,4 +14,6 @@ public class InterpretMessageCommand : ICommand
     }
 
     public void Execute() => _interpreter.Interpret(_message).Execute();
+
+    public IMessage Message => _message;
 }

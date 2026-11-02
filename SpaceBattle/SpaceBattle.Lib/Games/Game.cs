@@ -22,6 +22,8 @@ public class Game : IGame
 
     public bool HasCommands => _queue.HasCommands;
 
+    public IReadOnlyCollection<ICommand> Pending => _queue.Pending;
+
     public void Post(ICommand command)
     {
         ArgumentNullException.ThrowIfNull(command);
