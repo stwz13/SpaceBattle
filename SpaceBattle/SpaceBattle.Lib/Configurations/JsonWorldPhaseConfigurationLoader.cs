@@ -4,6 +4,13 @@ namespace SpaceBattle.Lib;
 
 public sealed class JsonWorldPhaseConfigurationLoader : IWorldPhaseConfigurationLoader
 {
+    private static readonly IReadOnlyDictionary<string, WorldPhaseExecution> ExecutionModes =
+        new Dictionary<string, WorldPhaseExecution>(StringComparer.Ordinal)
+        {
+            ["world"] = WorldPhaseExecution.World,
+            ["items"] = WorldPhaseExecution.Items
+        };
+
     public IReadOnlyList<WorldPhaseDescription> Load(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
@@ -21,12 +28,9 @@ public sealed class JsonWorldPhaseConfigurationLoader : IWorldPhaseConfiguration
             RequireFields(phase, "name", "execution", "action", "selector");
             var name = RequiredString(phase, "name");
             var action = RequiredString(phase, "action");
-            var execution = RequiredString(phase, "execution") switch
-            {
-                "world" => WorldPhaseExecution.World,
-                "items" => WorldPhaseExecution.Items,
-                var value => throw new FormatException($"Unknown execution mode '{value}' in phase '{name}'.")
-            };
+            var executionName = RequiredString(phase, "execution");
+            if (!ExecutionModes.TryGetValue(executionName, out var execution))
+                throw new FormatException($"Unknown execution mode '{executionName}' in phase '{name}'.");
             var selector = execution == WorldPhaseExecution.Items
                 ? RequiredString(phase, "selector") : null;
             if (execution == WorldPhaseExecution.World && phase.TryGetProperty("selector", out _))
