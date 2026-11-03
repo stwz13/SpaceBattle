@@ -12,6 +12,11 @@ public sealed class GameApiFactory(RuntimeFixture fixture, IReadOnlyDictionary<s
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        builder.ConfigureServices(services =>
+        {
+            var lifetime = services.SingleOrDefault(service => service.ImplementationType == typeof(ServerLifetime));
+            if (lifetime is not null) services.Remove(lifetime);
+        });
         builder.ConfigureServices(services => services.AddSingleton(new HttpGameServices(
             fixture.Resolve<IPlayerTokenValidator>("Auth.Validator"),
             player => new AuthenticatedMessageReceiver(fixture.Resolve<IMessageParser>(MessageDependencies.Parser), fixture.Runtime,
