@@ -14,6 +14,8 @@ public sealed class RegisterIoCDependencyManagedGames : ICommand
         var server = Ioc.Resolve<IServer>(ServerDependencies.Instance);
         IMessageInterpreter interpreter = new IoCMessageInterpreter();
         Register("Messages.Interpreter", _ => interpreter);
+        Register("Messages.Decorate", args => args is [Func<IMessageInterpreter, IMessageInterpreter> decorate]
+            ? interpreter = decorate(interpreter) : throw new ArgumentException("Expected an interpreter decorator."));
         Register(GameDependencies.Create, args => args is [string id] ? Create(id) : throw new ArgumentException("Expected a game id."));
         var runtime = new GameRuntime(server, new ConcurrentDictionary<string, IGameHost>(), new SemaphoreSlim(1, 1),
             id => InScope(scope, () => Ioc.Resolve<IManagedGame>(GameDependencies.Create, id)),
