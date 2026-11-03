@@ -160,6 +160,8 @@ public class Server : IServer, IServerContext
             _ring.Remove(member.Id);
             if (member.Run is not null)
             {
+                if (member.Run.IsCompleted) continue;
+                if (member.Thread is ServerThread { IsStopping: true }) continue;
                 send(member.Thread);
             }
         }

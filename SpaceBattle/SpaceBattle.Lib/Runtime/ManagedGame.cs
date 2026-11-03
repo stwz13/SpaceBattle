@@ -11,6 +11,10 @@ public sealed class ManagedGame(IGame inner, IGameScope scope) : IManagedGame
     public void Post(ICommand command) => inner.Post(command);
     public void Execute()
     {
+        try
+        {
         if (!Paused) inner.Execute();
+        }
+        catch (GameExecutionStoppedException) { }
     }
 }
