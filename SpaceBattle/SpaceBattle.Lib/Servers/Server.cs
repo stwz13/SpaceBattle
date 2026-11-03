@@ -12,6 +12,41 @@ public class Server : IServer, IServerContext
     private readonly string _prefix;
     private IServerState _state = CreatedServerState.Instance;
     private int _next;
+    private bool _removing;
+
+    public IReadOnlyList<(string Id, IServerThread Thread, Task? Completion)> Threads
+    {
+        get { lock (_gate) return _members.Select(member => (member.Id, member.Thread, member.Run)).ToArray(); }
+    }
+
+    public async Task RemoveThread(string id, Func<IServerThread, Task> evacuate)
+    {
+        ArgumentNullException.ThrowIfNull(evacuate);
+        Member member;
+        lock (_gate)
+        {
+            _state.EnsureRunning();
+            Require(!_removing, "The server is not available for thread removal.");
+            Require(_members.Count > 1, "The last server thread cannot be removed.");
+            member = _members.SingleOrDefault(candidate => candidate.Id == id)
+                ?? throw new KeyNotFoundException($"Thread '{id}' was not found.");
+            _removing = true;
+            _ring.Remove(id);
+        }
+        try
+        {
+            try { await evacuate(member.Thread).ConfigureAwait(false); }
+            catch
+            {
+                lock (_gate) _ring.Add(member.Id, member.Thread);
+                throw;
+            }
+            member.Thread.Add(_softStop(member.Thread));
+            await member.Run!.ConfigureAwait(false);
+            lock (_gate) _members.Remove(member);
+        }
+        finally { lock (_gate) _removing = false; }
+    }
 
     public Server(IConsistentHashRing<IServerThread> ring, Func<IServerThread> createThread,
         Func<IServerThread, ICommand> softStop, Func<IServerThread, ICommand> hardStop,
@@ -73,6 +108,7 @@ public class Server : IServer, IServerContext
     {
         lock (_gate)
         {
+            Require(!_removing, "Thread removal is in progress.");
             return _state.AddThread(this);
         }
     }
@@ -85,6 +121,7 @@ public class Server : IServer, IServerContext
     {
         lock (_gate)
         {
+            Require(!_removing, "Thread removal is in progress.");
             return _state.Stop(this, send);
         }
     }
@@ -135,6 +172,14 @@ public class Server : IServer, IServerContext
         _ring.Add(member.Id, member.Thread);
         _members.Add(member);
         return member;
+    }
+
+    private static void Require(bool condition, string message)
+    {
+        if (!condition)
+        {
+            throw new InvalidOperationException(message);
+        }
     }
 
     private sealed class Member(string id, IServerThread thread)
