@@ -42,6 +42,7 @@ public static class ServerComposition
             new RegisterIoCDependencyJwtAuthentication(options.JwtIssuer, options.JwtAudience, options.JwtSecret).Execute();
             new RegisterIoCDependencyCommandWhitelist(options.AllowedCommands).Execute();
             configureCommands?.Invoke();
+            new RegisterIoCDependencyPlayerAuthorization(options.CommandTargets, options.Players).Execute();
             new RegisterIoCDependencyErrorPolicy(new Dictionary<Type, (ErrorAction, int)>(), output).Execute();
             var scope = new GameScope(Ioc.Resolve<object>("IoC.Scope.Current"));
             var runtime = Ioc.Resolve<GameRuntime>("Server.Games");
