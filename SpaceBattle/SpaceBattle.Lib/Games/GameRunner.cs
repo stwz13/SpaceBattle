@@ -37,6 +37,15 @@ public class GameRunner : IGameRunner
         }
     }
 
+    public void Wake()
+    {
+        if (!_scheduled && _game.HasCommands)
+        {
+            _scheduled = true;
+            _thread.Schedule(this);
+        }
+    }
+
     private void Continue()
     {
         _scheduled = _game.HasCommands;

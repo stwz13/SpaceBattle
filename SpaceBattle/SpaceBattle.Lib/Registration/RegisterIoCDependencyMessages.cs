@@ -13,6 +13,16 @@ public class RegisterIoCDependencyMessages : ICommand
         Register(GameDependencies.Registry, args => Checked(args, 0, "The game registry takes no arguments.", registry));
         Register(MessageDependencies.Parser, args => Checked(args, 0, "The message parser takes no arguments.", parser));
         Register(MessageDependencies.Receiver, args => Checked(args, 0, "The message receiver takes no arguments.", receiver));
+        Register("Games.StartRestored", args =>
+        {
+            if (args is not [IGame game]) throw new ArgumentException("Expected a restored game.");
+            var thread = Ioc.Resolve<IServerThread>(RoutingDependencies.Thread, game.Id);
+            var runner = Ioc.Resolve<IGameRunner>(GameDependencies.Runner, game, thread);
+            var host = new GameHost(runner, thread, interpreter);
+            registry.Add(game.Id, host);
+            thread.Add(runner);
+            return host;
+        });
         Register(GameDependencies.Start, args =>
         {
             if (args.Length != 1 || args[0] is not string gameId)
