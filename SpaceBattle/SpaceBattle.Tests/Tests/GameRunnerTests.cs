@@ -25,6 +25,8 @@ public class GameRunnerTests
 
         public bool HasCommands => _commands.Count > 0;
 
+        public IReadOnlyCollection<Lib.ICommand> Pending => _commands.ToArray();
+
         public void Post(Lib.ICommand command) => _commands.Enqueue(command);
 
         public void Execute()
