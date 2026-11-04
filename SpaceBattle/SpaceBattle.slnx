@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="SpaceBattle.Lib/SpaceBattle.Lib.csproj" />
+  <Project Path="SpaceBattle.Http/SpaceBattle.Http.csproj" />
   <Project Path="SpaceBattle.Tests/SpaceBattle.Tests.csproj" />
 </Solution>
