@@ -12,6 +12,40 @@ public class Server : IServer
     private readonly string _prefix;
     private ServerState _state = ServerState.Created;
     private int _next;
+    private bool _removing;
+
+    public IReadOnlyList<(string Id, IServerThread Thread, Task? Completion)> Threads
+    {
+        get { lock (_gate) return _members.Select(member => (member.Id, member.Thread, member.Run)).ToArray(); }
+    }
+
+    public async Task RemoveThread(string id, Func<IServerThread, Task> evacuate)
+    {
+        ArgumentNullException.ThrowIfNull(evacuate);
+        Member member;
+        lock (_gate)
+        {
+            Require(_state == ServerState.Running && !_removing, "The server is not available for thread removal.");
+            Require(_members.Count > 1, "The last server thread cannot be removed.");
+            member = _members.SingleOrDefault(candidate => candidate.Id == id)
+                ?? throw new KeyNotFoundException($"Thread '{id}' was not found.");
+            _removing = true;
+            _ring.Remove(id);
+        }
+        try
+        {
+            try { await evacuate(member.Thread).ConfigureAwait(false); }
+            catch
+            {
+                lock (_gate) _ring.Add(member.Id, member.Thread);
+                throw;
+            }
+            member.Thread.Add(_softStop(member.Thread));
+            await member.Run!.ConfigureAwait(false);
+            lock (_gate) _members.Remove(member);
+        }
+        finally { lock (_gate) _removing = false; }
+    }
 
     public Server(IConsistentHashRing<IServerThread> ring, Func<IServerThread> createThread,
         Func<IServerThread, ICommand> softStop, Func<IServerThread, ICommand> hardStop,
@@ -74,6 +108,7 @@ public class Server : IServer
     {
         lock (_gate)
         {
+            Require(!_removing, "Thread removal is in progress.");
             Require(_state is ServerState.Created or ServerState.Running, "The server is stopping.");
             var member = Spawn();
             if (_state == ServerState.Running)
@@ -92,6 +127,7 @@ public class Server : IServer
     {
         lock (_gate)
         {
+            Require(!_removing, "Thread removal is in progress.");
             Require(_state is ServerState.Created or ServerState.Running, "The server has already been stopped.");
             _state = ServerState.Stopping;
             foreach (var member in _members)
