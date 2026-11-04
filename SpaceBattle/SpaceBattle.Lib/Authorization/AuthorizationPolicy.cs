@@ -20,18 +20,10 @@ public sealed class AuthorizationPolicy : IAuthorizationPolicy
         var allowed = false;
         foreach (var rule in _rules)
         {
-            switch (rule.Evaluate(subject, action, target))
-            {
-                case AuthorizationDecision.Deny:
-                    return false;
-                case AuthorizationDecision.Allow:
-                    allowed = true;
-                    break;
-                case AuthorizationDecision.Abstain:
-                    break;
-                default:
-                    return false;
-            }
+            var decision = rule.Evaluate(subject, action, target);
+            if (decision != AuthorizationDecision.Allow && decision != AuthorizationDecision.Abstain)
+                return false;
+            allowed |= decision == AuthorizationDecision.Allow;
         }
         return allowed;
     }

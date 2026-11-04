@@ -2,30 +2,30 @@ namespace SpaceBattle.Lib;
 
 public sealed class AccessGrantStore : IAccessGrants
 {
-    private readonly HashSet<(string Subject, string Action, string Scope)> _grants = new();
+    private readonly HashSet<(string Subject, string Action, string Area)> _grants = new();
 
-    public void Grant(string subject, string action, string scope)
+    public void Grant(string subject, string action, string area)
     {
-        Validate(subject, action, scope);
-        _grants.Add((subject, action, scope));
+        Validate(subject, action, area);
+        _grants.Add((subject, action, area));
     }
 
-    public void Revoke(string subject, string action, string scope)
+    public void Revoke(string subject, string action, string area)
     {
-        Validate(subject, action, scope);
-        _grants.Remove((subject, action, scope));
+        Validate(subject, action, area);
+        _grants.Remove((subject, action, area));
     }
 
-    public bool Contains(string subject, string action, string scope)
+    public bool Contains(string subject, string action, string area)
     {
-        Validate(subject, action, scope);
-        return _grants.Contains((subject, action, scope));
+        Validate(subject, action, area);
+        return _grants.Contains((subject, action, area));
     }
 
-    private static void Validate(string subject, string action, string scope)
+    private static void Validate(string subject, string action, string area)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(subject);
         ArgumentException.ThrowIfNullOrWhiteSpace(action);
-        ArgumentException.ThrowIfNullOrWhiteSpace(scope);
+        ArgumentException.ThrowIfNullOrWhiteSpace(area);
     }
 }

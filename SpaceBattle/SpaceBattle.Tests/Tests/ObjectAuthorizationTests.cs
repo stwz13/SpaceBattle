@@ -7,8 +7,8 @@ namespace SpaceBattle.Tests;
 
 public class ObjectAuthorizationTests
 {
-    private readonly AccessScopeTree _tree = new();
-    private readonly ObjectAccessScopes _objects = new();
+    private readonly AccessAreaTree _tree = new();
+    private readonly ObjectAccessAreas _objects = new();
     private readonly AccessGrantStore _grants = new();
     private readonly IGameItem _ship = new Mock<IGameItem>().Object;
     private readonly IGameItem _otherShip = new Mock<IGameItem>().Object;
@@ -32,9 +32,9 @@ public class ObjectAuthorizationTests
     [InlineData("team")]
     [InlineData("player1")]
     [InlineData("ship")]
-    public void Grants_Are_Inherited_From_Any_Ancestor_Or_Target(string scope)
+    public void Grants_Are_Inherited_From_Any_Ancestor_Or_Target(string area)
     {
-        _grants.Grant("user", "Move", scope);
+        _grants.Grant("user", "Move", area);
         Assert.True(_policy.IsAllowed("user", "Move", _ship));
     }
 
