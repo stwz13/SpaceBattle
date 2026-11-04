@@ -2,11 +2,11 @@ namespace SpaceBattle.Lib;
 
 public sealed class InheritedGrantRule : IAuthorizationRule
 {
-    private readonly IAccessScopeTree _tree;
-    private readonly IObjectAccessScopes _objects;
+    private readonly IAccessAreaTree _tree;
+    private readonly IObjectAccessAreas _objects;
     private readonly IAccessGrants _grants;
 
-    public InheritedGrantRule(IAccessScopeTree tree, IObjectAccessScopes objects, IAccessGrants grants)
+    public InheritedGrantRule(IAccessAreaTree tree, IObjectAccessAreas objects, IAccessGrants grants)
     {
         ArgumentNullException.ThrowIfNull(tree);
         ArgumentNullException.ThrowIfNull(objects);
@@ -18,8 +18,8 @@ public sealed class InheritedGrantRule : IAuthorizationRule
 
     public AuthorizationDecision Evaluate(string subject, string action, IGameItem target)
     {
-        var scope = _objects.FindScope(target);
-        return scope is not null && _tree.GetPath(scope).Any(node => _grants.Contains(subject, action, node))
+        var area = _objects.FindArea(target);
+        return area is not null && _tree.GetPath(area).Any(node => _grants.Contains(subject, action, node))
             ? AuthorizationDecision.Allow
             : AuthorizationDecision.Abstain;
     }
