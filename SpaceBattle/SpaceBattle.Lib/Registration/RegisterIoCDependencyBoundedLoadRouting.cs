@@ -23,15 +23,16 @@ public sealed class RegisterIoCDependencyBoundedLoadRouting : ICommand
     {
         var runtime = Ioc.Resolve<GameRuntime>("Server.Games");
         var ring = Ioc.Resolve<IConsistentHashRing<IServerThread>>(RoutingDependencies.Ring);
+        var moves = new PlannedMoves<IServerThread>();
         var meter = new PlacementLoadMeter<IServerThread>(() => runtime.Games
             .Where(game => game.State is GameHostState.Running or GameHostState.Moving)
-            .Select(game => (game.Id, game.Thread))
+            .Select(game => (game.Id, moves.Placement(game.Id, game.Thread, game.State == GameHostState.Moving)))
             .ToArray());
         var router = new BoundedLoadRouter<IServerThread>(ring, meter, _tolerance, _probes);
         RegisterIoCDependencyManagedGames.Register(RoutingDependencies.Thread, args =>
             args.Length == 1 && args[0] is string gameId
                 ? router.Route(gameId)
                 : throw new ArgumentException("Routing requires the identifier of a game."));
-        runtime.Route = router.Route;
+        runtime.Route = new PlanningRouter<IServerThread>(router, moves).Route;
     }
 }
