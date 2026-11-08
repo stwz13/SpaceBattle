@@ -19,16 +19,27 @@ public static class GeneratedNames
     public static string DependencyKey(string category, params string[] components) =>
         string.Join(".", components.Prepend(category));
 
-    public static string AdapterClass(Type iface) => Identifier("", iface, "Adapter");
+    // Preserve existing keys for ordinary namespace-qualified types. The reserved prefix
+    // gives nested types and names with literal underscores an unambiguous token.
+    private static string GeneratedTypeToken(Type type)
+    {
+        var name = type.FullName!;
+        return name.Contains('_') || name.Contains('+')
+            ? "__" + Convert.ToHexString(System.Text.Encoding.UTF8.GetBytes(name))
+            : Mangle(type);
+    }
 
-    public static string AdapterDependency(Type iface) => DependencyKey(DependencyNamespaces.Adapters, iface, "Adapter");
+    public static string AdapterClass(Type iface) => GeneratedTypeToken(iface) + "Adapter";
 
-    public static string CommandDependency(Type command) => DependencyKey(DependencyNamespaces.Commands, command);
+    public static string AdapterDependency(Type iface) => DependencyKey(DependencyNamespaces.Adapters, AdapterClass(iface));
 
-    public static string AdapterMethod(Type iface) => Identifier("Adapter", iface, "Adapter");
+    public static string CommandDependency(Type command) => DependencyKey(DependencyNamespaces.Commands, GeneratedTypeToken(command));
 
-    public static string CommandMethod(Type command) => Identifier("Command", command);
+    public static string AdapterMethod(Type iface) => "Adapter_" + AdapterClass(iface);
+
+    public static string CommandMethod(Type command) => "Command_" + GeneratedTypeToken(command);
 
     public static string PropertyDependency(Type view, PropertyInfo property) =>
-        DependencyKey(DependencyNamespaces.Properties, Mangle(view), Mangle(property.DeclaringType!), property.Name);
+        DependencyKey(DependencyNamespaces.Properties, GeneratedTypeToken(view),
+            GeneratedTypeToken(property.DeclaringType!), property.Name);
 }
