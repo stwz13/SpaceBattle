@@ -173,7 +173,7 @@ public class GameRegistrationTests
     }
 
     [Fact]
-    public void Games_On_Different_Threads_Each_Run_In_Their_Own_Scope()
+    public async Task Games_On_Different_Threads_Each_Run_In_Their_Own_Scope()
     {
         var first = Create("First");
         var second = Create("Second");
@@ -197,11 +197,12 @@ public class GameRegistrationTests
         };
         var outer = Ioc.Resolve<object>("IoC.Scope.Current");
 
-        Task.WaitAll(Task.Run(Visit(first)), Task.Run(Visit(second)));
+        var running = Task.WhenAll(Task.Run(Visit(first)), Task.Run(Visit(second)));
+        Assert.Same(outer, Ioc.Resolve<object>("IoC.Scope.Current"));
+        await running;
 
         Assert.All(met, together => Assert.True(together));
         Assert.Equal(["First", "Second"], seen.Order().ToArray());
-        Assert.Same(outer, Ioc.Resolve<object>("IoC.Scope.Current"));
     }
 
     [Fact]
