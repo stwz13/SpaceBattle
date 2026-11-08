@@ -43,10 +43,10 @@ public class GameRunnerTests
 
     private Lib.ICommand SoftStop() => new SoftStopCommand(_thread, new ExceptionFactory());
 
-    private static void Finishes(Task task) => Assert.True(task.Wait(Timeout));
+    private static Task Finishes(Task task) => task.WaitAsync(Timeout);
 
     [Fact]
-    public void Posted_Command_Runs_On_The_Thread_And_The_Game_Goes_Idle()
+    public async Task Posted_Command_Runs_On_The_Thread_And_The_Game_Goes_Idle()
     {
         var game = Game("A", 5);
         var runner = new GameRunner(game, _thread);
@@ -54,7 +54,7 @@ public class GameRunnerTests
         _thread.Add(new PostToGameCommand(runner, new DelegateStep(() => ids.Enqueue(Environment.CurrentManagedThreadId))));
         _thread.Add(SoftStop());
 
-        Finishes(_thread.Start());
+        await Finishes(_thread.Start());
 
         Assert.Equal([_thread.ThreadId], ids.ToArray());
         Assert.Equal(["A:slice"], _log.ToArray());
@@ -62,7 +62,7 @@ public class GameRunnerTests
     }
 
     [Fact]
-    public void Game_Reschedules_Itself_While_It_Has_Commands()
+    public async Task Game_Reschedules_Itself_While_It_Has_Commands()
     {
         var game = Game("A", 2);
         var runner = new GameRunner(game, _thread);
@@ -72,13 +72,13 @@ public class GameRunnerTests
         }
         _thread.Add(SoftStop());
 
-        Finishes(_thread.Start());
+        await Finishes(_thread.Start());
 
         Assert.Equal(["A:slice", "a", "b", "A:slice", "c", "d", "A:slice", "e"], _log.ToArray());
     }
 
     [Fact]
-    public void Idle_Game_Is_Woken_Up_By_A_New_Command()
+    public async Task Idle_Game_Is_Woken_Up_By_A_New_Command()
     {
         var game = Game("A", 5);
         var runner = new GameRunner(game, _thread);
@@ -91,12 +91,12 @@ public class GameRunnerTests
         SpinWait.SpinUntil(() => _log.Contains("second"), Timeout);
         _thread.Add(SoftStop());
 
-        Finishes(task);
+        await Finishes(task);
         Assert.Equal(["A:slice", "first", "A:slice", "second"], _log.ToArray());
     }
 
     [Fact]
-    public void Command_Posted_While_The_Game_Is_Scheduled_Does_Not_Schedule_It_Twice()
+    public async Task Command_Posted_While_The_Game_Is_Scheduled_Does_Not_Schedule_It_Twice()
     {
         var game = Game("A", 1);
         var runner = new GameRunner(game, _thread);
@@ -105,14 +105,14 @@ public class GameRunnerTests
         _thread.Add(new PostToGameCommand(runner, Log("c")));
         _thread.Add(SoftStop());
 
-        Finishes(_thread.Start());
+        await Finishes(_thread.Start());
 
         Assert.Equal(["a", "b", "c"], _log.ToArray().Where(e => e != "A:slice").ToArray());
         Assert.Equal(3, _log.ToArray().Count(e => e == "A:slice"));
     }
 
     [Fact]
-    public void Games_On_One_Thread_Take_Turns()
+    public async Task Games_On_One_Thread_Take_Turns()
     {
         var first = new GameRunner(Game("A", 1), _thread);
         var second = new GameRunner(Game("B", 1), _thread);
@@ -125,14 +125,14 @@ public class GameRunnerTests
         }));
         _thread.Add(SoftStop());
 
-        Finishes(_thread.Start());
+        await Finishes(_thread.Start());
 
         var order = _log.ToArray().Where(e => e is "a1" or "a2" or "b1" or "b2").ToArray();
         Assert.Equal(["a1", "b1", "a2", "b2"], order);
     }
 
     [Fact]
-    public void Failing_Game_Command_Goes_To_The_Handler_And_The_Game_Keeps_Running()
+    public async Task Failing_Game_Command_Goes_To_The_Handler_And_The_Game_Keeps_Running()
     {
         var game = Game("A", 1);
         var runner = new GameRunner(game, _thread);
@@ -141,7 +141,7 @@ public class GameRunnerTests
         _thread.Add(new PostToGameCommand(runner, Log("after")));
         _thread.Add(SoftStop());
 
-        Finishes(_thread.Start());
+        await Finishes(_thread.Start());
 
         Assert.Same(failure, Assert.Single(_handler.Handled.ToArray()).Exception);
         Assert.Contains("after", _log.ToArray());

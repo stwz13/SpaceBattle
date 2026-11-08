@@ -25,7 +25,7 @@ public class GameRunnerRegistrationTests
     }
 
     [Fact]
-    public void Message_Posted_Through_The_Registered_Commands_Runs_In_The_Game_Scope_On_The_Thread()
+    public async Task Message_Posted_Through_The_Registered_Commands_Runs_In_The_Game_Scope_On_The_Thread()
     {
         var thread = Ioc.Resolve<IServerThread>(ServerThreadDependencies.Create);
         var game = Ioc.Resolve<IGame>(GameDependencies.Create, "Battle");
@@ -36,7 +36,7 @@ public class GameRunnerRegistrationTests
         thread.Add(Ioc.Resolve<Lib.ICommand>(GameDependencies.Post, runner, message));
         thread.Add(Ioc.Resolve<Lib.ICommand>(ServerThreadDependencies.SoftStop, thread));
 
-        Assert.True(thread.Start().Wait(Timeout));
+        await thread.Start().WaitAsync(Timeout);
 
         var (threadId, context) = Assert.Single(seen.ToArray());
         Assert.Equal(thread.ThreadId, threadId);
