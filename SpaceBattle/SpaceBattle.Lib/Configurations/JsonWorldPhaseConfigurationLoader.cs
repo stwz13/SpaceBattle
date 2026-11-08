@@ -4,12 +4,14 @@ namespace SpaceBattle.Lib;
 
 public sealed class JsonWorldPhaseConfigurationLoader : IWorldPhaseConfigurationLoader
 {
-    private static readonly IReadOnlyDictionary<string, WorldPhaseExecution> ExecutionModes =
-        new Dictionary<string, WorldPhaseExecution>(StringComparer.Ordinal)
-        {
-            ["world"] = WorldPhaseExecution.World,
-            ["items"] = WorldPhaseExecution.Items
-        };
+    private readonly IReadOnlyDictionary<WorldPhaseExecution, bool> _requiresSelector;
+
+    public JsonWorldPhaseConfigurationLoader() : this(WorldPhaseModes.With(null)) { }
+
+    internal JsonWorldPhaseConfigurationLoader(IReadOnlyDictionary<WorldPhaseExecution, WorldPhaseMode> modes)
+    {
+        _requiresSelector = modes.ToDictionary(pair => pair.Key, pair => pair.Value.RequiresSelector);
+    }
 
     public IReadOnlyList<WorldPhaseDescription> Load(string path)
     {
@@ -29,11 +31,12 @@ public sealed class JsonWorldPhaseConfigurationLoader : IWorldPhaseConfiguration
             var name = RequiredString(phase, "name");
             var action = RequiredString(phase, "action");
             var executionName = RequiredString(phase, "execution");
-            if (!ExecutionModes.TryGetValue(executionName, out var execution))
+            var execution = new WorldPhaseExecution(executionName);
+            if (!_requiresSelector.TryGetValue(execution, out var requiresSelector))
                 throw new FormatException($"Unknown execution mode '{executionName}' in phase '{name}'.");
-            var selector = execution == WorldPhaseExecution.Items
+            var selector = requiresSelector
                 ? RequiredString(phase, "selector") : null;
-            if (execution == WorldPhaseExecution.World && phase.TryGetProperty("selector", out _))
+            if (!requiresSelector && phase.TryGetProperty("selector", out _))
                 throw new FormatException($"World phase '{name}' cannot specify a selector.");
             if (!names.Add(name))
                 throw new FormatException($"Duplicate world phase '{name}'.");

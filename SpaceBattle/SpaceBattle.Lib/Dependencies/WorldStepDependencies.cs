@@ -8,4 +8,6 @@ public static class WorldStepDependencies
     public const string DefaultAction = "WorldStep";
     public const string BattleProperty = "Battle";
     public const string ItemsProperty = "Items";
+
+    public static string Phase(string action, string name) => $"WorldStep.Phases.{action.Length}.{action}.{name}";
 }

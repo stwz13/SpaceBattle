@@ -1,7 +1,7 @@
 namespace SpaceBattle.Lib;
 
-public enum WorldPhaseExecution
+public readonly record struct WorldPhaseExecution(string Name)
 {
-    World,
-    Items
+    public static WorldPhaseExecution World { get; } = new("world");
+    public static WorldPhaseExecution Items { get; } = new("items");
 }

@@ -182,8 +182,9 @@ public sealed class WorldPhaseConfigurationTests : IDisposable
     {
         Write("""{"phases":[{"name":"Phase.Valid","execution":"world","action":"A"},{}]}""");
         Assert.Throws<FormatException>(() => Configure());
-        Register("Phase.Valid", _ => new TickTestCommand(() => { }));
-        Assert.IsType<TickTestCommand>(Ioc.Resolve<Lib.ICommand>("Phase.Valid"));
+        var key = WorldStepDependencies.Phase("WorldStep", "Phase.Valid");
+        Register(key, _ => new TickTestCommand(() => { }));
+        Assert.IsType<TickTestCommand>(Ioc.Resolve<Lib.ICommand>(key));
     }
 
     [Theory]
@@ -202,10 +203,52 @@ public sealed class WorldPhaseConfigurationTests : IDisposable
     {
         Write("""{"phases":[{"name":"Phase.World","execution":"world","action":"A"}]}""");
         Configure();
-        Assert.Throws<ArgumentException>(() => Ioc.Resolve<Lib.ICommand>("Phase.World"));
-        Assert.Throws<ArgumentException>(() => Ioc.Resolve<Lib.ICommand>("Phase.World", 42));
+        var key = WorldStepDependencies.Phase("WorldStep", "Phase.World");
+        Assert.Throws<ArgumentException>(() => Ioc.Resolve<Lib.ICommand>(key));
+        Assert.Throws<ArgumentException>(() => Ioc.Resolve<Lib.ICommand>(key, 42));
         Assert.Throws<ArgumentException>(() => Ioc.Resolve<string[]>("WorldStep.Config", 42));
         Ioc.Resolve<string[]>("WorldStep.Config")[0] = "Changed";
-        Assert.Equal(new[] { "Phase.World" }, Ioc.Resolve<string[]>("WorldStep.Config"));
+        Assert.Equal(new[] { key }, Ioc.Resolve<string[]>("WorldStep.Config"));
+    }
+
+    [Fact]
+    public void Configured_Phases_Cannot_Replace_Tick_Commands_And_Can_Reuse_Names_Across_Actions()
+    {
+        using var scheduler = new DelayedCommandScheduler(new TickTestClock(), _ => { }, _ => { });
+        new RegisterIoCDependencyGameTicks(scheduler).Execute();
+        var ticks = new GameTickFactory(scheduler).Create(TimeSpan.FromMilliseconds(50),
+            new TickTestCommand(() => { }), _ => { });
+        var name = GameTickDependencies.Stop;
+        Write($$"""{"phases":[{"name":"{{name}}","execution":"world","action":"Update"}]}""");
+        Configure();
+        Configure("OtherWorld");
+        ChildScope();
+        Configure();
+
+        Assert.IsType<StopGameTicksCommand>(Ioc.Resolve<Lib.ICommand>(name, ticks));
+        Assert.Equal(new[] { WorldStepDependencies.Phase("WorldStep", name) },
+            Ioc.Resolve<string[]>("WorldStep.Config"));
+        Assert.Equal(new[] { WorldStepDependencies.Phase("OtherWorld", name) },
+            Ioc.Resolve<string[]>("OtherWorld.Config"));
+    }
+
+    [Fact]
+    public void Modules_Can_Register_An_Execution_Mode_And_Use_It_In_Json()
+    {
+        ChildScope();
+        var executions = 0;
+        var mode = new WorldPhaseMode(new WorldPhaseExecution("custom"), false, (phase, frame) =>
+        {
+            Assert.Equal("Update", phase.Action);
+            Assert.NotNull(frame.GetProperty(WorldStepDependencies.BattleProperty));
+            return new TickTestCommand(() => executions++);
+        });
+        new RegisterIoCDependencyWorldPhaseConfigurationLoader([mode]).Execute();
+        Write("""{"phases":[{"name":"Module.Update","execution":"custom","action":"Update"}]}""");
+        Configure();
+
+        World().Execute();
+
+        Assert.Equal(1, executions);
     }
 }
