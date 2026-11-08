@@ -36,7 +36,7 @@ public class RegisterIoCDependencyComputedVelocity : ICommand
     public void Execute() => Ioc.Resolve<App.ICommand>("IoC.Register", _dependencyKey,
         (object[] args) =>
         {
-            var item = (IGameItemPropertyReader)args[0];
+            var item = (IGameItem)args[0];
             return _calculate((int)item.GetProperty(_speedProperty), (Angle)item.GetProperty(_directionProperty));
         }).Execute();
 }
