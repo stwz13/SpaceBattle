@@ -1,6 +1,7 @@
 namespace SpaceBattle.Lib;
 
-public interface IGameItem : IGameItemPropertyReader
+public interface IGameItem
 {
+    object GetProperty(string name);
     void SetProperty(string name, object value);
 }
