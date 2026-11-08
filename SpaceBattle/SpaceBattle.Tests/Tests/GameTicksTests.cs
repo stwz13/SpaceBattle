@@ -330,4 +330,73 @@ public class GameTicksTests
         Assert.Throws<ArgumentOutOfRangeException>(() => factory.Create(-Period, step, host.Game.Enqueue));
         Assert.Throws<ArgumentOutOfRangeException>(() => factory.Create(Period, step, host.Game.Enqueue, -1));
     }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Delivery_Failure_Stops_The_Chain_And_Allows_A_Fresh_Start(bool failAtServer)
+    {
+        var time = new TickTestClock();
+        var server = new Queue<ICommand>();
+        var game = new Queue<ICommand>();
+        var errors = new List<Exception>();
+        var failure = new InvalidOperationException("Queue rejected the tick");
+        var reject = true;
+        using var scheduler = new DelayedCommandScheduler(time, command =>
+        {
+            if (reject && failAtServer)
+                throw failure;
+            server.Enqueue(command);
+        }, errors.Add);
+        var ticks = new GameTickFactory(scheduler).Create(Period, new TickTestCommand(() => { }), command =>
+        {
+            if (reject && !failAtServer)
+                throw failure;
+            game.Enqueue(command);
+        });
+
+        ticks.Start();
+        time.Advance(Period);
+        time.FireDue();
+        if (failAtServer)
+            Assert.Same(failure, Assert.Single(errors));
+        else
+            Assert.Same(failure, Assert.Throws<InvalidOperationException>(server.Dequeue().Execute));
+
+        Assert.False(ticks.IsRunning);
+        Assert.Same(failure, ticks.Failure);
+        Assert.Null(time.NextDeadline);
+        Assert.Equal(0, ticks.TickNumber);
+
+        reject = false;
+        ticks.Start();
+        time.Advance(Period);
+        time.FireDue();
+        server.Dequeue().Execute();
+        game.Dequeue().Execute();
+
+        Assert.True(ticks.IsRunning);
+        Assert.Null(ticks.Failure);
+        Assert.Equal(1, ticks.TickNumber);
+    }
+
+    [Fact]
+    public void Delivery_Failure_From_A_Previous_Generation_Does_Not_Stop_A_Restart()
+    {
+        using var host = new Host();
+        var ticks = new GameTickFactory(host.Scheduler).Create(Period, new TickTestCommand(() => { }),
+            _ => throw new InvalidOperationException("Queue rejected the tick"));
+        ticks.Start();
+        host.Time.Advance(Period);
+        host.Time.FireDue();
+        var staleDelivery = host.Server.Dequeue();
+
+        ticks.Stop();
+        ticks.Start();
+        Assert.Throws<InvalidOperationException>(staleDelivery.Execute);
+
+        Assert.True(ticks.IsRunning);
+        Assert.Null(ticks.Failure);
+        Assert.Equal(Period + Period, host.Time.NextDeadline);
+    }
 }

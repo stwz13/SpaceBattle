@@ -32,8 +32,8 @@ public sealed class RegisterIoCDependencyGameTicks : ICommand
         Register(GameTickDependencies.Stop, args => new StopGameTicksCommand(Ticks(args)));
     }
 
-    private static IGameTicks Ticks(object[] args) => args.Length == 1 && args[0] is IGameTicks ticks
-        ? ticks : throw new ArgumentException("Expected one IGameTicks instance.");
+    private static IGameTickControl Ticks(object[] args) => args.Length == 1 && args[0] is IGameTickControl ticks
+        ? ticks : throw new ArgumentException("Expected one IGameTickControl instance.");
 
     private static void Register(string key, Func<object[], object> strategy) =>
         Ioc.Resolve<App.ICommand>("IoC.Register", key, strategy).Execute();
