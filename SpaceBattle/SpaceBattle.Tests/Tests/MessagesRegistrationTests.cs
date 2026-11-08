@@ -52,7 +52,7 @@ public class MessagesRegistrationTests
         JsonSerializer.Serialize(new { gameId = game, command = "Echo", args = new { text } });
 
     [Fact]
-    public void Message_Reaches_The_Game_On_Its_Thread_Inside_The_Game_Scope()
+    public async Task Message_Reaches_The_Game_On_Its_Thread_Inside_The_Game_Scope()
     {
         var thread = AddThread("T1");
         Ioc.Resolve<IGameHost>(GameDependencies.Start, "Battle");
@@ -62,7 +62,7 @@ public class MessagesRegistrationTests
         Assert.True(SpinWait.SpinUntil(() => !_seen.IsEmpty, Timeout));
         thread.Add(Ioc.Resolve<Lib.ICommand>(ServerThreadDependencies.SoftStop, thread));
 
-        Assert.True(task.Wait(Timeout));
+        await task.WaitAsync(Timeout);
         var (game, threadId, text) = Assert.Single(_seen.ToArray());
         Assert.Equal("Battle", game);
         Assert.Equal(thread.ThreadId, threadId);
@@ -71,7 +71,7 @@ public class MessagesRegistrationTests
     }
 
     [Fact]
-    public void Messages_Of_A_Game_Keep_Their_Order()
+    public async Task Messages_Of_A_Game_Keep_Their_Order()
     {
         var thread = AddThread("T1");
         Ioc.Resolve<IGameHost>(GameDependencies.Start, "Battle");
@@ -83,12 +83,12 @@ public class MessagesRegistrationTests
         }
         thread.Add(Ioc.Resolve<Lib.ICommand>(ServerThreadDependencies.SoftStop, thread));
 
-        Assert.True(task.Wait(Timeout));
+        await task.WaitAsync(Timeout);
         Assert.Equal(Enumerable.Range(0, 50).Select(index => index.ToString()), _seen.Select(entry => entry.Text));
     }
 
     [Fact]
-    public void Games_Are_Spread_Over_Threads_By_The_Ring_And_Messages_Follow_Their_Game()
+    public async Task Games_Are_Spread_Over_Threads_By_The_Ring_And_Messages_Follow_Their_Game()
     {
         var first = AddThread("T1");
         var second = AddThread("T2");
@@ -105,20 +105,21 @@ public class MessagesRegistrationTests
             Receive(Echo(game, "y"));
         }
         Assert.True(SpinWait.SpinUntil(() => _seen.Count == 80, Timeout));
+        var routedThreads = games.ToDictionary(game => game,
+            game => Ioc.Resolve<IServerThread>(RoutingDependencies.Thread, game).ThreadId);
         first.Add(Ioc.Resolve<Lib.ICommand>(ServerThreadDependencies.SoftStop, first));
         second.Add(Ioc.Resolve<Lib.ICommand>(ServerThreadDependencies.SoftStop, second));
 
-        Assert.True(Task.WaitAll(tasks, Timeout));
+        await Task.WhenAll(tasks).WaitAsync(Timeout);
         var threadsOfGame = _seen.GroupBy(entry => entry.Game).ToDictionary(group => group.Key,
             group => group.Select(entry => entry.Thread).Distinct().ToArray());
         Assert.All(threadsOfGame.Values, threads => Assert.Single(threads));
         Assert.Equal(2, threadsOfGame.Values.Select(threads => threads[0]).Distinct().Count());
-        Assert.All(games, game => Assert.Equal(
-            Ioc.Resolve<IServerThread>(RoutingDependencies.Thread, game).ThreadId, threadsOfGame[game][0]));
+        Assert.All(games, game => Assert.Equal(routedThreads[game], threadsOfGame[game][0]));
     }
 
     [Fact]
-    public void Unknown_Command_Is_Reported_To_The_Thread_Handler_And_Does_Not_Stop_The_Game()
+    public async Task Unknown_Command_Is_Reported_To_The_Thread_Handler_And_Does_Not_Stop_The_Game()
     {
         var thread = AddThread("T1");
         Ioc.Resolve<IGameHost>(GameDependencies.Start, "Battle");
@@ -128,13 +129,13 @@ public class MessagesRegistrationTests
         Receive(Echo("Battle", "still alive"));
         thread.Add(Ioc.Resolve<Lib.ICommand>(ServerThreadDependencies.SoftStop, thread));
 
-        Assert.True(task.Wait(Timeout));
+        await task.WaitAsync(Timeout);
         Assert.Single(_handler.Handled.ToArray());
         Assert.Equal("still alive", Assert.Single(_seen.ToArray()).Text);
     }
 
     [Fact]
-    public void Message_Cannot_Reach_Dependencies_Outside_The_Messages_Namespace()
+    public async Task Message_Cannot_Reach_Dependencies_Outside_The_Messages_Namespace()
     {
         var thread = AddThread("T1");
         Ioc.Resolve<IGameHost>(GameDependencies.Start, "Battle");
@@ -145,7 +146,7 @@ public class MessagesRegistrationTests
         Receive("""{"gameId":"Battle","command":"Secret"}""");
         thread.Add(Ioc.Resolve<Lib.ICommand>(ServerThreadDependencies.SoftStop, thread));
 
-        Assert.True(task.Wait(Timeout));
+        await task.WaitAsync(Timeout);
         Assert.False(reached);
         Assert.Single(_handler.Handled.ToArray());
     }
