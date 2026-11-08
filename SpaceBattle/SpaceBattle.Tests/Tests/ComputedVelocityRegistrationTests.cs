@@ -219,13 +219,13 @@ public class ComputedVelocityRegistrationTests
     }
 
     [Fact]
-    public void Custom_Calculation_Accepts_A_Read_Only_Property_Source()
+    public void Custom_Calculation_Uses_The_Current_Item_Properties()
     {
         SetScope(Ioc.Resolve<object>("IoC.Scope.Create"));
         var angle = new Angle(2);
-        var reader = new Mock<IGameItemPropertyReader>(MockBehavior.Strict);
-        reader.Setup(item => item.GetProperty("Speed")).Returns(10);
-        reader.Setup(item => item.GetProperty("Direction")).Returns(angle);
+        var item = new Mock<IGameItem>(MockBehavior.Strict);
+        item.Setup(source => source.GetProperty("Speed")).Returns(10);
+        item.Setup(source => source.GetProperty("Direction")).Returns(angle);
         var expected = new Vector(3, 4);
         new RegisterIoCDependencyComputedVelocity((speed, direction) =>
         {
@@ -234,6 +234,6 @@ public class ComputedVelocityRegistrationTests
             return expected;
         }).Execute();
 
-        Assert.Same(expected, Ioc.Resolve<Vector>(ComputedVelocityDependencies.Velocity, reader.Object));
+        Assert.Same(expected, Ioc.Resolve<Vector>(ComputedVelocityDependencies.Velocity, item.Object));
     }
 }
