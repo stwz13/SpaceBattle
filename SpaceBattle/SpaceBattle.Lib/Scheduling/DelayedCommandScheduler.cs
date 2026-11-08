@@ -100,6 +100,8 @@ public sealed class DelayedCommandScheduler : IDelayedCommandScheduler, IDisposa
             }
             catch (Exception error)
             {
+                if (entry.Command is ICommandDeliveryFailureHandler handler)
+                    handler.OnDeliveryFailed(error);
                 _onDeliveryError(error);
             }
         }

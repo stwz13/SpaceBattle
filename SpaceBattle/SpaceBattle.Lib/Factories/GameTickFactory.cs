@@ -15,7 +15,7 @@ public sealed class GameTickFactory : IGameTickFactory
     {
         ArgumentNullException.ThrowIfNull(postToGame);
         return new GameTicks(_scheduler, step, worldStep,
-            (ticks, generation, number) => new DeliverGameTickCommand(postToGame,
-                new TickCommand(ticks, generation, number)), maxCatchUpTicks);
+            (ticks, generation, number, onDeliveryFailed) => new DeliverGameTickCommand(postToGame,
+                new TickCommand(ticks, generation, number), onDeliveryFailed), maxCatchUpTicks);
     }
 }
