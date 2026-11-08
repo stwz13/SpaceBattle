@@ -29,7 +29,7 @@ public class ServerTests
     {
         var server = NewServer(5);
 
-        Assert.Equal(ServerState.Created, server.State);
+        Assert.False(server.IsRunning);
         Assert.Equal(0, server.ThreadCount);
         Assert.Equal(0, _ring.Count);
     }
@@ -38,21 +38,21 @@ public class ServerTests
     [InlineData(1)]
     [InlineData(4)]
     [InlineData(30)]
-    public void Start_Creates_The_Configured_Number_Of_Threads_And_Puts_Them_On_The_Ring(int count)
+    public async Task Start_Creates_The_Configured_Number_Of_Threads_And_Puts_Them_On_The_Ring(int count)
     {
         var server = NewServer(count);
 
         server.Start();
 
-        Assert.Equal(ServerState.Running, server.State);
+        Assert.True(server.IsRunning);
         Assert.Equal(count, server.ThreadCount);
         Assert.Equal(count, _ring.Count);
         Assert.Equal(count, _created.Count);
-        Assert.True(server.SoftStop().Wait(Timeout));
+        await server.SoftStop().WaitAsync(Timeout);
     }
 
     [Fact]
-    public void Every_Thread_Is_Started_And_Runs_Commands_On_Its_Own_Thread()
+    public async Task Every_Thread_Is_Started_And_Runs_Commands_On_Its_Own_Thread()
     {
         var server = NewServer(3);
         var ids = new ConcurrentBag<int>();
@@ -66,21 +66,21 @@ public class ServerTests
 
         Assert.Equal(3, ids.Distinct().Count());
         Assert.Equal(_created.Select(thread => thread.ThreadId).Order(), ids.Order());
-        Assert.True(server.SoftStop().Wait(Timeout));
+        await server.SoftStop().WaitAsync(Timeout);
     }
 
     [Fact]
-    public void Server_Cannot_Be_Started_Twice()
+    public async Task Server_Cannot_Be_Started_Twice()
     {
         var server = NewServer(1);
         server.Start();
 
         Assert.Throws<InvalidOperationException>(() => server.Start());
-        Assert.True(server.SoftStop().Wait(Timeout));
+        await server.SoftStop().WaitAsync(Timeout);
     }
 
     [Fact]
-    public void Thread_Can_Be_Added_To_A_Running_Server_And_Starts_Right_Away()
+    public async Task Thread_Can_Be_Added_To_A_Running_Server_And_Starts_Right_Away()
     {
         var server = NewServer(2);
         server.Start();
@@ -92,11 +92,11 @@ public class ServerTests
         Assert.True(ran.Wait(Timeout));
         Assert.Equal(3, server.ThreadCount);
         Assert.Equal(3, _ring.Count);
-        Assert.True(server.SoftStop().Wait(Timeout));
+        await server.SoftStop().WaitAsync(Timeout);
     }
 
     [Fact]
-    public void Thread_Added_Before_Start_Waits_For_Start()
+    public async Task Thread_Added_Before_Start_Waits_For_Start()
     {
         var server = NewServer(2);
 
@@ -106,11 +106,11 @@ public class ServerTests
         server.Start();
         Assert.Equal(3, server.ThreadCount);
         Assert.True(SpinWait.SpinUntil(() => added.ThreadId != 0, Timeout));
-        Assert.True(server.SoftStop().Wait(Timeout));
+        await server.SoftStop().WaitAsync(Timeout);
     }
 
     [Fact]
-    public void Adding_A_Thread_Only_Moves_A_Part_Of_The_Games()
+    public async Task Adding_A_Thread_Only_Moves_A_Part_Of_The_Games()
     {
         var server = NewServer(5);
         server.Start();
@@ -122,11 +122,11 @@ public class ServerTests
         var moved = keys.Where(key => !ReferenceEquals(before[key], _ring.Find(key))).ToArray();
         Assert.All(moved, key => Assert.Same(added, _ring.Find(key)));
         Assert.InRange(moved.Length, 1, 600);
-        Assert.True(server.SoftStop().Wait(Timeout));
+        await server.SoftStop().WaitAsync(Timeout);
     }
 
     [Fact]
-    public void Soft_Stop_Finishes_Everything_Already_Queued_And_Ends_All_Threads()
+    public async Task Soft_Stop_Finishes_Everything_Already_Queued_And_Ends_All_Threads()
     {
         var server = NewServer(3);
         var done = new ConcurrentBag<int>();
@@ -141,15 +141,15 @@ public class ServerTests
 
         var stopped = server.SoftStop();
 
-        Assert.True(stopped.Wait(Timeout));
+        await stopped.WaitAsync(Timeout);
         Assert.Equal(300, done.Count);
-        Assert.Equal(ServerState.Stopped, server.State);
+        Assert.False(server.IsRunning);
         Assert.Equal(0, _ring.Count);
         Assert.All(_created, thread => Assert.Throws<InvalidOperationException>(() => thread.Add(new DelegateStep(() => { }))));
     }
 
     [Fact]
-    public void Soft_Stop_Waits_For_Scheduled_Work_Too()
+    public async Task Soft_Stop_Waits_For_Scheduled_Work_Too()
     {
         var server = NewServer(1);
         server.Start();
@@ -163,7 +163,7 @@ public class ServerTests
             }
         }));
 
-        Assert.True(server.SoftStop().Wait(Timeout));
+        await server.SoftStop().WaitAsync(Timeout);
 
         Assert.Equal([1, 2, 3, 4, 5], steps.ToArray());
     }
@@ -178,7 +178,7 @@ public class ServerTests
     }
 
     [Fact]
-    public void Hard_Stop_Ends_Threads_That_Would_Never_Drain()
+    public async Task Hard_Stop_Ends_Threads_That_Would_Never_Drain()
     {
         var server = NewServer(2);
         var ticks = 0;
@@ -192,8 +192,8 @@ public class ServerTests
 
         var stopped = server.HardStop();
 
-        Assert.True(stopped.Wait(Timeout));
-        Assert.Equal(ServerState.Stopped, server.State);
+        await stopped.WaitAsync(Timeout);
+        Assert.False(server.IsRunning);
         Assert.Equal(0, _ring.Count);
         var after = Volatile.Read(ref ticks);
         Thread.Sleep(100);
@@ -201,35 +201,35 @@ public class ServerTests
     }
 
     [Fact]
-    public void Stopped_Threads_Leave_The_Ring_So_Nothing_Is_Routed_To_Them()
+    public async Task Stopped_Threads_Leave_The_Ring_So_Nothing_Is_Routed_To_Them()
     {
         var server = NewServer(2);
         server.Start();
 
         var stopped = server.SoftStop();
 
-        Assert.True(stopped.Wait(Timeout));
+        await stopped.WaitAsync(Timeout);
         Assert.Throws<InvalidOperationException>(() => _ring.Find("Battle"));
     }
 
     [Fact]
-    public void Server_That_Was_Never_Started_Can_Be_Stopped()
+    public async Task Server_That_Was_Never_Started_Can_Be_Stopped()
     {
         var server = NewServer(2);
         server.AddThread();
 
-        Assert.True(server.HardStop().Wait(Timeout));
+        await server.HardStop().WaitAsync(Timeout);
 
-        Assert.Equal(ServerState.Stopped, server.State);
+        Assert.False(server.IsRunning);
         Assert.Equal(0, _ring.Count);
     }
 
     [Fact]
-    public void Stopped_Server_Cannot_Be_Used_Again()
+    public async Task Stopped_Server_Cannot_Be_Used_Again()
     {
         var server = NewServer(1);
         server.Start();
-        Assert.True(server.SoftStop().Wait(Timeout));
+        await server.SoftStop().WaitAsync(Timeout);
 
         Assert.Throws<InvalidOperationException>(() => server.Start());
         Assert.Throws<InvalidOperationException>(() => server.AddThread());
@@ -238,7 +238,40 @@ public class ServerTests
     }
 
     [Fact]
-    public void Failure_Of_A_Thread_Is_Reported_By_The_Stop_Task_But_The_Server_Still_Stops()
+    public async Task Ensure_Running_Passes_Only_While_The_Server_Is_Running()
+    {
+        var server = NewServer(1);
+        Assert.Throws<InvalidOperationException>(() => server.EnsureRunning());
+        server.Start();
+
+        server.EnsureRunning();
+
+        await server.SoftStop().WaitAsync(Timeout);
+        Assert.Throws<InvalidOperationException>(() => server.EnsureRunning());
+    }
+
+    [Fact]
+    public async Task Server_Is_Stopping_Until_Every_Thread_Has_Finished_And_Refuses_Everything_Meanwhile()
+    {
+        var server = NewServer(1);
+        using var release = new ManualResetEventSlim();
+        server.Start();
+        _created[0].Add(new DelegateStep(() => release.Wait(Timeout)));
+
+        var stopped = server.SoftStop();
+
+        Assert.False(server.IsRunning);
+        Assert.Throws<InvalidOperationException>(() => server.Start());
+        Assert.Throws<InvalidOperationException>(() => server.AddThread());
+        Assert.Throws<InvalidOperationException>(() => { _ = server.SoftStop(); });
+        Assert.Throws<InvalidOperationException>(() => { _ = server.HardStop(); });
+        release.Set();
+        await stopped.WaitAsync(Timeout);
+        Assert.False(server.IsRunning);
+    }
+
+    [Fact]
+    public async Task Failure_Of_A_Thread_Is_Reported_By_The_Stop_Task_But_The_Server_Still_Stops()
     {
         var failing = new FailingHandler();
         var thread = new ServerThread(new BlockingCommandQueue(), new BlockingCommandQueue(), new QueueScheduler(),
@@ -250,8 +283,8 @@ public class ServerTests
 
         var stopped = server.SoftStop();
 
-        Assert.Throws<AggregateException>(() => stopped.Wait(Timeout));
-        Assert.True(SpinWait.SpinUntil(() => server.State == ServerState.Stopped, Timeout));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => stopped.WaitAsync(Timeout));
+        Assert.False(server.IsRunning);
     }
 
     private sealed class FailingHandler : IExceptionHandler
@@ -260,7 +293,7 @@ public class ServerTests
     }
 
     [Fact]
-    public void Thread_Identifiers_Use_The_Prefix_And_Are_Unique()
+    public async Task Thread_Identifiers_Use_The_Prefix_And_Are_Unique()
     {
         var ids = new List<string>();
         var ring = new RecordingRing(ids);
@@ -271,7 +304,7 @@ public class ServerTests
         server.AddThread();
 
         Assert.Equal(["Worker-0", "Worker-1", "Worker-2"], ids);
-        Assert.True(server.SoftStop().Wait(Timeout));
+        await server.SoftStop().WaitAsync(Timeout);
     }
 
     private sealed class RecordingRing(List<string> ids) : IConsistentHashRing<IServerThread>
@@ -299,7 +332,7 @@ public class ServerTests
     }
 
     [Fact]
-    public void Hard_Stop_Overtakes_A_Long_Queue_Of_Waiting_Commands()
+    public async Task Hard_Stop_Overtakes_A_Long_Queue_Of_Waiting_Commands()
     {
         var server = NewServer(2);
         var executed = 0;
@@ -317,13 +350,13 @@ public class ServerTests
         var stopped = server.HardStop();
         release.Set();
 
-        Assert.True(stopped.Wait(Timeout));
+        await stopped.WaitAsync(Timeout);
         Assert.Equal(0, executed);
-        Assert.Equal(ServerState.Stopped, server.State);
+        Assert.False(server.IsRunning);
     }
 
     [Fact]
-    public void Soft_Stop_Does_Not_Overtake_The_Queue()
+    public async Task Soft_Stop_Does_Not_Overtake_The_Queue()
     {
         var server = NewServer(2);
         var executed = 0;
@@ -341,7 +374,7 @@ public class ServerTests
         var stopped = server.SoftStop();
         release.Set();
 
-        Assert.True(stopped.Wait(Timeout));
+        await stopped.WaitAsync(Timeout);
         Assert.Equal(100, executed);
     }
 }

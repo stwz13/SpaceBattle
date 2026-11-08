@@ -38,18 +38,18 @@ public class ServerRegistrationTests
     private static void Run(string key) => Ioc.Resolve<Lib.ICommand>(key).Execute();
 
     [Fact]
-    public void Server_Is_One_Shared_Object_With_The_Configured_Number_Of_Threads()
+    public async Task Server_Is_One_Shared_Object_With_The_Configured_Number_Of_Threads()
     {
         new RegisterIoCDependencyServer(7).Execute();
 
         Assert.Same(Server(), Server());
-        Assert.Equal(ServerState.Created, Server().State);
+        Assert.False(Server().IsRunning);
 
         Run(ServerDependencies.Start);
 
         Assert.Equal(7, Server().ThreadCount);
         Assert.Equal(7, Ioc.Resolve<IConsistentHashRing<IServerThread>>(RoutingDependencies.Ring).Count);
-        Assert.True(Server().SoftStop().Wait(Timeout));
+        await Server().SoftStop().WaitAsync(Timeout);
     }
 
     [Fact]
@@ -69,22 +69,24 @@ public class ServerRegistrationTests
             receiver.Receive(JsonSerializer.Serialize(new { gameId = game, command = "Echo", args = new { text = game } }));
         }
         Run(ServerDependencies.SoftStop);
-        Assert.True(SpinWait.SpinUntil(() => Server().State == ServerState.Stopped, Timeout));
+        Assert.True(SpinWait.SpinUntil(() => _seen.Count == games.Length, Timeout));
+
+        Assert.False(Server().IsRunning);
 
         Assert.Equal(games.Order(), _seen.Order());
         Assert.Empty(_handler.Handled.ToArray());
     }
 
     [Fact]
-    public void Server_Can_Be_Started_From_A_Thread_That_Has_No_Scope_Of_Its_Own()
+    public async Task Server_Can_Be_Started_From_A_Thread_That_Has_No_Scope_Of_Its_Own()
     {
         new RegisterIoCDependencyServer(2).Execute();
         var server = Server();
 
-        Task.Run(server.Start).Wait(Timeout);
+        await Task.Run(server.Start).WaitAsync(Timeout);
 
         Assert.Equal(2, server.ThreadCount);
-        Assert.True(server.SoftStop().Wait(Timeout));
+        await server.SoftStop().WaitAsync(Timeout);
     }
 
     [Fact]
@@ -95,7 +97,8 @@ public class ServerRegistrationTests
 
         Run(ServerDependencies.HardStop);
 
-        Assert.True(SpinWait.SpinUntil(() => Server().State == ServerState.Stopped, Timeout));
+        Assert.False(Server().IsRunning);
+        Assert.Equal(0, Ioc.Resolve<IConsistentHashRing<IServerThread>>(RoutingDependencies.Ring).Count);
     }
 
     [Fact]
