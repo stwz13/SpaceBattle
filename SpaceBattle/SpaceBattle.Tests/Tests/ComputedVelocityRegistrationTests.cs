@@ -217,4 +217,23 @@ public class ComputedVelocityRegistrationTests
         Assert.ThrowsAny<ArgumentException>(() =>
             new RegisterIoCDependencyComputedVelocity(directionProperty: name!));
     }
+
+    [Fact]
+    public void Custom_Calculation_Uses_The_Current_Item_Properties()
+    {
+        SetScope(Ioc.Resolve<object>("IoC.Scope.Create"));
+        var angle = new Angle(2);
+        var item = new Mock<IGameItem>(MockBehavior.Strict);
+        item.Setup(source => source.GetProperty("Speed")).Returns(10);
+        item.Setup(source => source.GetProperty("Direction")).Returns(angle);
+        var expected = new Vector(3, 4);
+        new RegisterIoCDependencyComputedVelocity((speed, direction) =>
+        {
+            Assert.Equal(10, speed);
+            Assert.Same(angle, direction);
+            return expected;
+        }).Execute();
+
+        Assert.Same(expected, Ioc.Resolve<Vector>(ComputedVelocityDependencies.Velocity, item.Object));
+    }
 }
