@@ -36,7 +36,7 @@ public class ServerThreadRegistrationTests
     }
 
     [Fact]
-    public void Created_Thread_Runs_Commands_And_Stops_With_The_Registered_Soft_Stop()
+    public async Task Created_Thread_Runs_Commands_And_Stops_With_The_Registered_Soft_Stop()
     {
         var thread = Create();
         var executed = 0;
@@ -44,26 +44,26 @@ public class ServerThreadRegistrationTests
         thread.Add(Stop(ServerThreadDependencies.SoftStop, thread));
         thread.Add(new DelegateStep(() => executed++));
 
-        Assert.True(thread.Start().Wait(Timeout));
+        await thread.Start().WaitAsync(Timeout);
 
         Assert.Equal(2, executed);
     }
 
     [Fact]
-    public void Created_Thread_Stops_Immediately_With_The_Registered_Hard_Stop()
+    public async Task Created_Thread_Stops_Immediately_With_The_Registered_Hard_Stop()
     {
         var thread = Create();
         var executed = 0;
         thread.Add(Stop(ServerThreadDependencies.HardStop, thread));
         thread.Add(new DelegateStep(() => executed++));
 
-        Assert.True(thread.Start().Wait(Timeout));
+        await thread.Start().WaitAsync(Timeout);
 
         Assert.Equal(0, executed);
     }
 
     [Fact]
-    public void Created_Thread_Reports_Failures_To_The_Registered_Handler()
+    public async Task Created_Thread_Reports_Failures_To_The_Registered_Handler()
     {
         var thread = Create();
         var failure = new InvalidOperationException("boom");
@@ -71,7 +71,7 @@ public class ServerThreadRegistrationTests
         thread.Add(bad);
         thread.Add(Stop(ServerThreadDependencies.SoftStop, thread));
 
-        Assert.True(thread.Start().Wait(Timeout));
+        await thread.Start().WaitAsync(Timeout);
 
         var handled = Assert.Single(_handler.Handled.ToArray());
         Assert.Same(bad, handled.Command);

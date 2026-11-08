@@ -54,7 +54,7 @@ public class CommandCollectionsTests
     }
 
     [Fact]
-    public void Consume_Waits_For_Commands_Added_From_Another_Thread()
+    public async Task Consume_Waits_For_Commands_Added_From_Another_Thread()
     {
         var queue = new BlockingCommandQueue();
         var command = Step();
@@ -63,8 +63,7 @@ public class CommandCollectionsTests
         queue.Add(command);
         queue.CompleteAdding();
 
-        Assert.True(consumed.Wait(TimeSpan.FromSeconds(10)));
-        Assert.Equal([command], consumed.Result);
+        Assert.Equal([command], await consumed.WaitAsync(TimeSpan.FromSeconds(10)));
     }
 
     [Fact]
@@ -125,17 +124,16 @@ public class CommandCollectionsTests
     }
 
     [Fact]
-    public void Urgent_Command_Wakes_A_Consumer_Waiting_On_An_Empty_Queue()
+    public async Task Urgent_Command_Wakes_A_Consumer_Waiting_On_An_Empty_Queue()
     {
         var queue = new BlockingCommandQueue();
         var urgent = Step();
         var taken = Task.Run(() => queue.Take());
-        Assert.False(taken.Wait(TimeSpan.FromMilliseconds(200)));
+        await Assert.ThrowsAsync<TimeoutException>(() => taken.WaitAsync(TimeSpan.FromMilliseconds(200)));
 
         queue.AddFirst(urgent);
 
-        Assert.True(taken.Wait(TimeSpan.FromSeconds(10)));
-        Assert.Same(urgent, taken.Result);
+        Assert.Same(urgent, await taken.WaitAsync(TimeSpan.FromSeconds(10)));
     }
 
     [Fact]
@@ -164,16 +162,16 @@ public class CommandCollectionsTests
     }
 
     [Fact]
-    public void Completing_The_Queue_Releases_Every_Waiting_Consumer()
+    public async Task Completing_The_Queue_Releases_Every_Waiting_Consumer()
     {
         var queue = new BlockingCommandQueue();
         var consumers = Enumerable.Range(0, 5).Select(_ => Task.Run(() => queue.Consume().ToArray())).ToArray();
-        Assert.False(Task.WaitAll(consumers, TimeSpan.FromMilliseconds(200)));
+        await Assert.ThrowsAsync<TimeoutException>(() => Task.WhenAll(consumers).WaitAsync(TimeSpan.FromMilliseconds(200)));
 
         queue.CompleteAdding();
 
-        Assert.True(Task.WaitAll(consumers, TimeSpan.FromSeconds(10)));
-        Assert.All(consumers, consumer => Assert.Empty(consumer.Result));
+        var results = await Task.WhenAll(consumers).WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.All(results, result => Assert.Empty(result));
     }
 
     [Fact]
@@ -191,7 +189,7 @@ public class CommandCollectionsTests
     }
 
     [Fact]
-    public void Nothing_Is_Lost_Or_Duplicated_With_Many_Producers_And_Consumers()
+    public async Task Nothing_Is_Lost_Or_Duplicated_With_Many_Producers_And_Consumers()
     {
         var queue = new BlockingCommandQueue();
         var seen = new System.Collections.Concurrent.ConcurrentBag<ICommand>();
@@ -208,7 +206,7 @@ public class CommandCollectionsTests
             pair => (pair.index % 3 == 0 ? (Action<ICommand>)queue.AddFirst : queue.Add)(pair.command));
         queue.CompleteAdding();
 
-        Assert.True(Task.WaitAll(consumers, TimeSpan.FromSeconds(30)));
+        await Task.WhenAll(consumers).WaitAsync(TimeSpan.FromSeconds(30));
         Assert.Equal(2000, seen.Count);
         Assert.Equal(2000, seen.Distinct().Count());
         Assert.All(sent, command => Assert.Contains(command, seen));

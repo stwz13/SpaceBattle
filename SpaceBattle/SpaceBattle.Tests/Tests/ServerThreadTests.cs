@@ -41,42 +41,43 @@ public class ServerThreadTests
 
     private Lib.ICommand SoftStop() => new SoftStopCommand(_thread, _exceptions);
 
-    private static void Finishes(Task task) => Assert.True(task.Wait(Timeout));
+    private static Task Finishes(Task task) => task.WaitAsync(Timeout);
 
     [Fact]
-    public void Commands_Run_In_Order_On_The_Thread_Own_Thread()
+    public async Task Commands_Run_In_Order_On_The_Thread_Own_Thread()
     {
         var ids = new ConcurrentQueue<int>();
         _thread.Add(Step(() => ids.Enqueue(Environment.CurrentManagedThreadId)));
         _thread.Add(Log("a"));
         _thread.Add(Log("b"));
         _thread.Add(SoftStop());
+        var testThreadId = Environment.CurrentManagedThreadId;
 
-        Finishes(_thread.Start());
+        await Finishes(_thread.Start());
 
         Assert.Equal(["a", "b"], _log.ToArray());
         Assert.Equal([_thread.ThreadId], ids.ToArray());
-        Assert.NotEqual(Environment.CurrentManagedThreadId, _thread.ThreadId);
+        Assert.NotEqual(testThreadId, _thread.ThreadId);
     }
 
     [Fact]
-    public void Idle_Thread_Waits_On_The_Queue_Instead_Of_Spinning_And_Wakes_For_New_Commands()
+    public async Task Idle_Thread_Waits_On_The_Queue_Instead_Of_Spinning_And_Wakes_For_New_Commands()
     {
         var task = _thread.Start();
 
-        Assert.False(task.Wait(TimeSpan.FromMilliseconds(300)));
+        await Assert.ThrowsAsync<TimeoutException>(() => task.WaitAsync(TimeSpan.FromMilliseconds(300)));
         Assert.Equal(1, _inbox.Takes);
         Assert.Equal(0, _inbox.TryTakes);
 
         _thread.Add(Log("late"));
         _thread.Add(SoftStop());
 
-        Finishes(task);
+        await Finishes(task);
         Assert.Equal(["late"], _log.ToArray());
     }
 
     [Fact]
-    public void Failing_Command_Goes_To_The_Handler_With_Its_Exception_And_The_Thread_Goes_On()
+    public async Task Failing_Command_Goes_To_The_Handler_With_Its_Exception_And_The_Thread_Goes_On()
     {
         var failure = new InvalidOperationException("boom");
         var bad = Step(() => throw failure);
@@ -85,7 +86,7 @@ public class ServerThreadTests
         _thread.Add(Log("b"));
         _thread.Add(SoftStop());
 
-        Finishes(_thread.Start());
+        await Finishes(_thread.Start());
 
         Assert.Equal(["a", "b"], _log.ToArray());
         var handled = Assert.Single(_handler.Handled.ToArray());
@@ -94,7 +95,7 @@ public class ServerThreadTests
     }
 
     [Fact]
-    public void Failing_Scheduled_Command_Goes_To_The_Handler_Too()
+    public async Task Failing_Scheduled_Command_Goes_To_The_Handler_Too()
     {
         var failure = new InvalidOperationException("boom");
         var bad = Step(() => throw failure);
@@ -102,14 +103,14 @@ public class ServerThreadTests
         _thread.Add(Log("a"));
         _thread.Add(SoftStop());
 
-        Finishes(_thread.Start());
+        await Finishes(_thread.Start());
 
         Assert.Same(failure, Assert.Single(_handler.Handled.ToArray()).Exception);
         Assert.Equal(["a"], _log.ToArray());
     }
 
     [Fact]
-    public void Failing_Handler_Ends_The_Thread_With_Its_Exception()
+    public async Task Failing_Handler_Ends_The_Thread_With_Its_Exception()
     {
         var failure = new InvalidOperationException("handler failed");
         _handler.Reaction = (_, _) => throw failure;
@@ -117,72 +118,72 @@ public class ServerThreadTests
 
         var task = _thread.Start();
 
-        var error = Assert.Throws<AggregateException>(() => task.Wait(Timeout));
-        Assert.Same(failure, error.InnerException);
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => task.WaitAsync(Timeout));
+        Assert.Same(failure, error);
     }
 
     [Fact]
-    public void HardStop_Ends_The_Thread_Without_Running_The_Rest_Of_The_Queue()
+    public async Task HardStop_Ends_The_Thread_Without_Running_The_Rest_Of_The_Queue()
     {
         _thread.Add(Log("a"));
         _thread.Add(HardStop());
         _thread.Add(Log("b"));
         _thread.Add(Log("c"));
 
-        Finishes(_thread.Start());
+        await Finishes(_thread.Start());
 
         Assert.Equal(["a"], _log.ToArray());
         Assert.Throws<InvalidOperationException>(() => _thread.Add(Log("late")));
     }
 
     [Fact]
-    public void HardStop_Drops_Scheduled_Work_Too()
+    public async Task HardStop_Drops_Scheduled_Work_Too()
     {
         _thread.Add(Step(() => _thread.Schedule(new Slice(_thread, _log, 5))));
         _thread.Add(HardStop());
 
-        Finishes(_thread.Start());
+        await Finishes(_thread.Start());
 
         Assert.Empty(_log.ToArray());
     }
 
     [Fact]
-    public void SoftStop_Runs_Everything_Already_Queued_And_Then_Ends()
+    public async Task SoftStop_Runs_Everything_Already_Queued_And_Then_Ends()
     {
         _thread.Add(Log("a"));
         _thread.Add(SoftStop());
         _thread.Add(Log("b"));
         _thread.Add(Log("c"));
 
-        Finishes(_thread.Start());
+        await Finishes(_thread.Start());
 
         Assert.Equal(["a", "b", "c"], _log.ToArray());
         Assert.Throws<InvalidOperationException>(() => _thread.Add(Log("late")));
     }
 
     [Fact]
-    public void SoftStop_Waits_For_Scheduled_Work_To_Finish()
+    public async Task SoftStop_Waits_For_Scheduled_Work_To_Finish()
     {
         _thread.Add(Step(() => _thread.Schedule(new Slice(_thread, _log, 4))));
         _thread.Add(SoftStop());
 
-        Finishes(_thread.Start());
+        await Finishes(_thread.Start());
 
         Assert.Equal(["s1", "s2", "s3", "s4"], _log.ToArray());
     }
 
     [Fact]
-    public void Soft_Stopped_Thread_Ends_Even_If_Nothing_Is_Left()
+    public async Task Soft_Stopped_Thread_Ends_Even_If_Nothing_Is_Left()
     {
         _thread.Add(SoftStop());
 
-        Finishes(_thread.Start());
+        await Finishes(_thread.Start());
 
         Assert.Empty(_log.ToArray());
     }
 
     [Fact]
-    public void Stop_Commands_Refuse_To_Run_Outside_The_Thread_They_Stop()
+    public async Task Stop_Commands_Refuse_To_Run_Outside_The_Thread_They_Stop()
     {
         Assert.Throws<InvalidOperationException>(HardStop().Execute);
         Assert.Throws<InvalidOperationException>(SoftStop().Execute);
@@ -194,12 +195,12 @@ public class ServerThreadTests
         _thread.Add(Log("and working"));
         _thread.Add(SoftStop());
 
-        Finishes(task);
+        await Finishes(task);
         Assert.Equal(["still working", "and working"], _log.ToArray());
     }
 
     [Fact]
-    public void Long_Running_Commands_Take_Turns_With_New_Commands()
+    public async Task Long_Running_Commands_Take_Turns_With_New_Commands()
     {
         _thread.Add(Step(() =>
         {
@@ -210,13 +211,13 @@ public class ServerThreadTests
         _thread.Add(Log("B"));
         _thread.Add(SoftStop());
 
-        Finishes(_thread.Start());
+        await Finishes(_thread.Start());
 
         Assert.Equal(["start", "A", "s1", "B", "s2", "s3"], _log.ToArray());
     }
 
     [Fact]
-    public void Scheduled_Work_Does_Not_Wait_For_New_Commands()
+    public async Task Scheduled_Work_Does_Not_Wait_For_New_Commands()
     {
         using var done = new ManualResetEventSlim();
         _thread.Add(Step(() => _thread.Schedule(new Slice(_thread, _log, 50))));
@@ -226,12 +227,12 @@ public class ServerThreadTests
         Assert.True(done.Wait(Timeout));
 
         _thread.Add(SoftStop());
-        Finishes(task);
+        await Finishes(task);
         Assert.Equal(50, _log.Count);
     }
 
     [Fact]
-    public void Behaviour_Can_Be_Replaced_For_The_Next_Commands()
+    public async Task Behaviour_Can_Be_Replaced_For_The_Next_Commands()
     {
         var turns = 0;
         _thread.Add(Step(() =>
@@ -248,19 +249,19 @@ public class ServerThreadTests
         }));
         _thread.Add(Log("never"));
 
-        Finishes(_thread.Start());
+        await Finishes(_thread.Start());
 
         Assert.Equal(3, turns);
         Assert.Equal(["switching"], _log.ToArray());
     }
 
     [Fact]
-    public void Many_Producers_Can_Add_Commands_At_The_Same_Time()
+    public async Task Many_Producers_Can_Add_Commands_At_The_Same_Time()
     {
         var executed = 0;
         var task = _thread.Start();
 
-        Task.WaitAll(Enumerable.Range(0, 4)
+        await Task.WhenAll(Enumerable.Range(0, 4)
             .Select(_ => Task.Run(() =>
             {
                 foreach (var command in Enumerable.Range(0, 250).Select(__ => Step(() => executed++)))
@@ -271,19 +272,19 @@ public class ServerThreadTests
             .ToArray());
         _thread.Add(SoftStop());
 
-        Finishes(task);
+        await Finishes(task);
         Assert.Equal(1000, executed);
     }
 
     [Fact]
-    public void Thread_Can_Be_Started_Only_Once()
+    public async Task Thread_Can_Be_Started_Only_Once()
     {
         var task = _thread.Start();
 
         Assert.Throws<InvalidOperationException>(() => { _ = _thread.Start(); });
 
         _thread.Add(SoftStop());
-        Finishes(task);
+        await Finishes(task);
     }
 
     [Fact]
@@ -309,7 +310,7 @@ public class ServerThreadTests
     }
 
     [Fact]
-    public void Interrupting_Command_Runs_Before_Everything_Already_In_The_Queue()
+    public async Task Interrupting_Command_Runs_Before_Everything_Already_In_The_Queue()
     {
         var gate = new ManualResetEventSlim();
         _thread.Add(Step(() => gate.Wait(Timeout)));
@@ -321,12 +322,12 @@ public class ServerThreadTests
         gate.Set();
         _thread.Add(SoftStop());
 
-        Finishes(task);
+        await Finishes(task);
         Assert.Equal(["urgent", "a", "b"], _log.ToArray());
     }
 
     [Fact]
-    public void Interrupting_Hard_Stop_Drops_Everything_Waiting_In_The_Queue_And_The_Scheduler()
+    public async Task Interrupting_Hard_Stop_Drops_Everything_Waiting_In_The_Queue_And_The_Scheduler()
     {
         var gate = new ManualResetEventSlim();
         var executed = 0;
@@ -344,26 +345,26 @@ public class ServerThreadTests
         _thread.Interrupt(HardStop());
         gate.Set();
 
-        Finishes(task);
+        await Finishes(task);
         Assert.Equal(0, executed);
     }
 
     [Fact]
-    public void Interrupting_Command_Wakes_An_Idle_Thread()
+    public async Task Interrupting_Command_Wakes_An_Idle_Thread()
     {
         var task = _thread.Start();
-        Assert.False(task.Wait(TimeSpan.FromMilliseconds(200)));
+        await Assert.ThrowsAsync<TimeoutException>(() => task.WaitAsync(TimeSpan.FromMilliseconds(200)));
 
         _thread.Interrupt(HardStop());
 
-        Finishes(task);
+        await Finishes(task);
     }
 
     [Fact]
-    public void Interrupting_A_Thread_That_Is_Stopping_Is_Rejected()
+    public async Task Interrupting_A_Thread_That_Is_Stopping_Is_Rejected()
     {
         _thread.Add(SoftStop());
-        Finishes(_thread.Start());
+        await Finishes(_thread.Start());
 
         Assert.Throws<InvalidOperationException>(() => _thread.Interrupt(Log("late")));
     }
