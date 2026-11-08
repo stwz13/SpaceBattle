@@ -2,7 +2,6 @@ using App;
 
 namespace SpaceBattle.Lib;
 
-/// <summary>Replaces plain ring routing by bounded-load routing. Run it after managed games and rebalancing are registered.</summary>
 public sealed class RegisterIoCDependencyBoundedLoadRouting : ICommand
 {
     private readonly double _tolerance;

@@ -1,10 +1,5 @@
 namespace SpaceBattle.Lib;
 
-/// <summary>
-/// Consistent hashing with bounded loads. A key goes to the owner chosen by the ring unless the owner already
-/// holds the permitted share of keys; then the key is hashed again with a salt until a node with room is found.
-/// The permitted share is ceil((total + 1) / nodes * (1 + tolerance)).
-/// </summary>
 public sealed class BoundedLoadRouter<TNode> : IRouter<TNode>
     where TNode : class
 {

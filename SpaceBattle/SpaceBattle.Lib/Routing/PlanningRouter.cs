@@ -1,6 +1,5 @@
 namespace SpaceBattle.Lib;
 
-/// <summary>Records every decision of the inner router, so one rebalancing pass sees the moves it has already started.</summary>
 public sealed class PlanningRouter<TNode> : IRouter<TNode>
     where TNode : class
 {

@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 
 namespace SpaceBattle.Lib;
 
-/// <summary>Remembers where keys were sent, so keys which are still moving are counted on their destination.</summary>
 public sealed class PlannedMoves<TNode>
     where TNode : class
 {
