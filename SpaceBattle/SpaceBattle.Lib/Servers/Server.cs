@@ -46,6 +46,16 @@ public class Server : IServer, IServerContext, IServerThreadMembership
     }
     void IServerThreadMembership.EndRemoval() { lock (_gate) _removing = false; }
 
+    public void StopThread(IServerThread thread)
+    {
+        lock (_gate)
+        {
+            foreach (var member in _members.Where(member => ReferenceEquals(member.Thread, thread)))
+                _ring.Remove(member.Id);
+            thread.HardStop();
+        }
+    }
+
     public Server(IConsistentHashRing<IServerThread> ring, Func<IServerThread> createThread,
         Func<IServerThread, ICommand> softStop, Func<IServerThread, ICommand> hardStop,
         int threadCount, string prefix = "Thread")
@@ -159,6 +169,8 @@ public class Server : IServer, IServerContext, IServerThreadMembership
             _ring.Remove(member.Id);
             if (member.Completion is not null)
             {
+                if (member.Completion.IsCompleted) continue;
+                if (member.Thread.IsStopping) continue;
                 send(member.Thread);
             }
         }

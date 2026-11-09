@@ -12,6 +12,8 @@ public class ServerThread : IServerThread, ICommand
     private bool _running = true;
     private int _threadId;
     private int _started;
+    private int _closing;
+    public bool IsStopping => Volatile.Read(ref _closing) != 0;
 
     public ServerThread(ICommandQueue inbox, ICommandQueue loop, IScheduler scheduler,
         IExceptionHandler handler, IExceptionFactory exceptions)
@@ -80,12 +82,14 @@ public class ServerThread : IServerThread, ICommand
 
     public void HardStop()
     {
+        Interlocked.Exchange(ref _closing, 1);
         _inboxIn.CompleteAdding();
         _running = false;
     }
 
     public void SoftStop()
     {
+        Interlocked.Exchange(ref _closing, 1);
         _inboxIn.CompleteAdding();
         UpdateBehaviour(Drain);
     }

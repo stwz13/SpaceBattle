@@ -3,6 +3,7 @@ namespace SpaceBattle.Lib;
 public interface IServerThread
 {
     int ThreadId { get; }
+    bool IsStopping { get; }
     Task Start();
     void Add(ICommand command);
     bool TryAdd(ICommand command);

@@ -30,6 +30,7 @@ public class MessageReceiverTests
         public bool Full { get; init; }
 
         public int ThreadId => 0;
+        public bool IsStopping => false;
 
         public Task Start() => throw new NotSupportedException();
 

@@ -77,7 +77,8 @@ public sealed class RegisterIoCDependencyManagedGames : ICommand
         var context = Ioc.Resolve<IBattleContextFactory>(BattleContextDependencies.Factory).Create(id);
         var scope = new GameScope(Ioc.Resolve<object>("IoC.Scope.Create"));
         using (scope.Enter()) new RegisterIoCDependencyBattleContext(context).Execute();
-        return new ManagedGame(new Game(id, new GameQueue(), scope, Ioc.Resolve<IQuantum>(GameDependencies.Quantum)), scope);
+        var state = new GameExecutionState();
+        return new ManagedGame(new Game(id, new GameQueue(), scope, Ioc.Resolve<IQuantum>(GameDependencies.Quantum), () => !state.Paused), scope, state);
     }
 
     internal static Task Invoke(IServerThread thread, Action action)
