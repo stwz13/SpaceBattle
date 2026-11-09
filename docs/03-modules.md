@@ -1,308 +1,221 @@
-# 03. Справочник по модулям (контракты и поведение)
+# 03. Справочник по модулям
 
-Срез 2026-11-09; состав веток и SHA — [01](01-branches.md), свежие тесты — [06](06-status.md). Числа старого аудита не переносятся на новые tips.
+Для каждого модуля: файлы → контракт → обязательные свойства → исключения → тесты.
+Пути — от `SpaceBattle/SpaceBattle.Lib/`, тесты — от `SpaceBattle/SpaceBattle.Tests/Tests/`. Общая картина — [02-architecture.md](02-architecture.md), ключи — [04-ioc-keys.md](04-ioc-keys.md). Где модуль лежит по веткам — [01-branches.md](01-branches.md).
 
-Каждый раздел: **ветка** → файлы → контракт → обязательные свойства `IGameItem` → исключения → тесты.
-Пути — от `SpaceBattle/SpaceBattle.Lib/` (если не указано `Tests/`). Общая модель — [02-architecture.md](02-architecture.md), ключи — [04-ioc-keys.md](04-ioc-keys.md).
-Имена команд определяют IoC-ключи `Commands.<Mangled>` (точки → `_`), см. архитектуру §4.
+Имена команд определяют ключи `Commands.<M(тип)>` (точки в имени типа → `_`).
 
 ---
-## 3.1 Foundation (`foundation/command-infrastructure`, trunk)
+## Часть A. Игровые команды (ствол `foundation/command-infrastructure` и ветки damage / world-update)
+
+### 3.1 Инфраструктура
 
 | Тема | Файлы |
 |---|---|
-| Базовые интерфейсы | `Interfaces/ICommand.cs`, `IGameItem.cs`, `IGameItemFactory.cs`, `IGameItemStorage.cs`, `IBattleContext(.Factory).cs`, `ICommandContext.cs`, `IExceptionFactory.cs` |
-| Объекты | `GameItems/GameItem.cs`, `Storages/GameItemStorage.cs`, `Factories/{GameItemFactory,BattleContextFactory,ExceptionFactory}.cs`, `Contexts/{BattleContext,CommandContext}.cs` |
-| Значения | `ValueObjects/Vector.cs`, `Angle.cs` |
-| Команды | `Commands/MacroCommand.cs`, `SetPropertyCommand.cs` |
-| Кодогенерация | `Builders/*`, `Compilers/RoslynSourceCompiler.cs`, `Finders/CommandFinder.cs`, `Inspectors/InterfaceInspector.cs`, `Utilities/{GeneratedNames,CSharpTypeName}.cs`, `Registration/GeneratedStrategyRegistration.cs`, `Registration/RegisterIoCDependencyGenerated*.cs`, `Dependencies/Dependency.cs` |
-| Действия | `Strategies/{ActionCompositionStrategy,ActionConfigurationStrategy}.cs`, `Registration/RegisterIoCDependency{ActionComposition,ContextActionComposition,ActionConfigurations,ContextCommand,MacroCommand}.cs` |
-| Вычисляемая скорость | `Registration/RegisterIoCDependencyComputedVelocity.cs`, `Dependencies/ComputedVelocityDependencies.cs` |
+| Интерфейсы | `Interfaces/{ICommand,IGameItem,IGameItemFactory,IGameItemStorage,IBattleContext,IBattleContextFactory,ICommandContext,IExceptionFactory}.cs` |
+| Объекты | `GameItems/GameItem.cs`, `Storages/GameItemStorage.cs`, `Factories/*`, `Contexts/{BattleContext,CommandContext}.cs` |
+| Значения | `ValueObjects/{Vector,Angle,VelocityCalculation}.cs` |
+| Команды | `Commands/{MacroCommand,SetPropertyCommand}.cs` |
+| Кодогенерация | `Builders/*`, `Compilers/RoslynSourceCompiler.cs`, `Finders/CommandFinder.cs`, `Inspectors/InterfaceInspector.cs`, `Utilities/{GeneratedNames,CSharpTypeName}.cs`, `Registration/GeneratedStrategyRegistration.cs`, `Dependencies/Dependency.cs` |
+| Действия | `Strategies/{ActionCompositionStrategy,ActionConfigurationStrategy}.cs` и регистрации `…ActionComposition`, `…ContextActionComposition`, `…ActionConfigurations`, `…ContextCommand`, `…MacroCommand` |
+
+Тесты: `GameItemFactoryTests`, `GameItemStorageTests`, `BattleContextTests`, `CodeGeneratorTests`, `ActionCompositionTests`, `ContextActionCompositionTests`, `MacroCommandTest`, `VectorTest`, `AngleTest`.
 
 Нюансы:
-- `GameItemStorage.Add` с дублирующимся id → `ArgumentException` (поведение `Dictionary.Add`); `Get` несуществующего → `KeyNotFoundException`; `GetSnapshot()` возвращает **копию** (read-only).
-- `GameItemFactory.Create(props)` копирует словарь (`StringComparer.Ordinal`).
-- `RegisterIoCDependencyComputedVelocity(key="Properties.ComputedVelocity", speedProp="Speed", dirProp="Direction")`: `Vector(round(speed·cos θ), round(speed·sin θ))`, округление `AwayFromZero`; `speed < 0` → `ArgumentOutOfRangeException`; переполнение → `OverflowException` (`checked`).
-  Для `Angle(1)` (45°) и `speed=10` даёт `(7,7)`.
-- `RegisterIoCDependencyContextCommand(depKey, commandKey, role)`: регистрирует `depKey`, который из `ICommandContext` берёт объект роли `role` и резолвит `commandKey` с этим объектом. `depKey != commandKey` обязательно.
-- `Vector.operator +` с разной размерностью → `ArgumentException("Vectors must have the same dimensions")`.
-- `RoslynSourceCompiler` в trunk кэширует статически по тексту; shooting и свежий серверный стек используют кэш экземпляра. `RegisterIoCDependencyGeneratedStrategies` делегирует общую GeneratedStrategyRegistration.
+- `GameItemStorage.Add` с повторным ключом → `ArgumentException`; `Get` несуществующего → `KeyNotFoundException`; `GetSnapshot()` возвращает копию.
+- `GameItemFactory.Create(props)` копирует словарь.
+- `RegisterIoCDependencyComputedVelocity`: `Vector(round(speed·cos θ), round(speed·sin θ))`, округление от нуля; `speed < 0` → `ArgumentOutOfRangeException`; переполнение → `OverflowException`. Для `Angle(1)` и `speed = 10` получается `(7, 7)`.
+- `RegisterIoCDependencyContextCommand(depKey, commandKey, role)` регистрирует ключ, который берёт из `ICommandContext` предмет роли и резолвит `commandKey` с ним; `depKey` и `commandKey` должны различаться.
+- `Vector.operator +` с разной размерностью → `ArgumentException`.
 
----
-## 3.2 Movement — `feature/movement-fuel`
+### 3.2 Движение и топливо
 
 | | |
 |---|---|
 | Команды | `MoveCommand(IMoving)`: `Position += Velocity`; `CheckFuelCommand(IFuelCheckable)`: `Fuel < FuelConsumption` → `InvalidOperationException("Not enough fuel to move.")`; `BurnFuelCommand(IFuelBurnable)`: `Fuel -= FuelConsumption` |
-| Интерфейсы | `IMoving{Vector Position{get;set;}; Vector Velocity{get;}}`, `IFuelCheckable{Fuel, FuelConsumption}`, `IFuelBurnable{Fuel{get;set;}, FuelConsumption}` |
-| Действие | `Config/Movement.config`: Check → Move → Burn (порядок важен!) |
+| Интерфейсы | `IMoving{Position get/set, Velocity get}`, `IFuelCheckable{Fuel, FuelConsumption}`, `IFuelBurnable{Fuel get/set, FuelConsumption}` |
+| Действие | `Config/Movement.config`: Check → Move → Burn (порядок важен) |
 | Вызов | `Ioc.Resolve<Lib.ICommand>("Commands.Action", "Movement", ship)` |
-| Свойства объекта | `Position`, `Velocity` **или** (`Speed`+`Direction` при `MovementDependencies.ComputedVelocity`), `Fuel`, `FuelConsumption` |
-| Вычисляемая скорость | передать `[MovementDependencies.ComputedVelocity]` в `RegisterIoCDependencyGeneratedStrategies` и вызвать `new RegisterIoCDependencyComputedVelocity().Execute()` |
+| Свойства предмета | `Position`, `Velocity` либо (`Speed` + `Direction` при `MovementDependencies.ComputedVelocity`), `Fuel`, `FuelConsumption` |
 | Тесты | `MovementTests`, `MoveCommandTests`, `FuelCommandTests`, `MovementComputedVelocityTests` |
 
-Если топлива не хватает — позиция и топливо не меняются (Check падает первым). Отсутствующее свойство даёт `KeyNotFoundException`; отсутствие отката в Macro означает, что последствия ошибки зависят от шага, на котором она возникла.
+Если топлива не хватает, позиция и топливо не меняются (Check падает первым, макрокоманда прерывается). Нехватка любого свойства → `KeyNotFoundException`, предмет не мутируется.
 
----
-## 3.3 Rotation — `feature/rotation`
+### 3.3 Вращение
 
-`RotateCommand(IRotating)`: `Direction += AngularVelocity` (оператор `Angle+`, по модулю 8). `IRotating{Angle Direction{get;set;}; Angle AngularVelocity{get;}}`.
-Действие `Rotation` (`Config/Rotation.config` = `Commands.SpaceBattle_Lib_RotateCommand`). Тесты: `RotateTest`, `RotationActionTests`; тест-дублёры `TestDoubles/RotationCommands.cs`.
+`RotateCommand(IRotating)`: `Direction += AngularVelocity` (по модулю 8). `IRotating{Direction get/set, AngularVelocity get}`. Действие `Rotation` (`Config/Rotation.config`).
 
----
-## 3.4 Refuel — два взаимоисключающих варианта
+### 3.4 Дозаправка
 
-### A. `feature/refuel` (старая база `0e79e07`, удалена на GitHub в ходе аудита)
-- `CheckRefuelSourceCommand(IRefuelCheckable)`: `FuelReserve < RefuelAmount` → `ExceptionFactory.InvalidOperation("Not enough fuel in reserve to refuel.")`.
-- `RefuelCommand(IRefuelable)`: `FuelReserve -= RefuelAmount; Fuel += RefuelAmount`.
-- `Refuel.config`: Check → Refuel. Один объект (`Commands.Action`, "Refuel", item) со свойствами `Fuel`, `FuelReserve`, `RefuelAmount`, `ExceptionFactory`.
-- Тесты: `RefuelTests`, `RefuelCommandTests` (число тестов — в свежей таблице статуса).
-- Эта ветка сохраняет исторические IVectorFactory/IAngleFactory, RegisterIoCDependencyValueFactories и Utility.Vector/Angle. В актуальном trunk этих фабрик значений нет; конструирование Vector/Angle прямое.
+`RefuelCommand(IRefuelTarget target, IRefuelSource source)`: `amount = min(source.RefuelAmount, source.FuelReserve)`; `target.Fuel += amount`; `source.FuelReserve -= amount` (отдаёт остаток, а не падает).
+`IRefuelTarget{Fuel get/set}`, `IRefuelSource{FuelReserve get/set, RefuelAmount get}`.
+`RegisterIoCDependencyRefuelContextCommand(depKey, targetRole, sourceRole)` (роли должны различаться). `Config/Refuel.config` = одна строка `Context.Refuel`; вызов — `Commands.ContextAction` с `CommandContext({Target: ship, Source: tanker})`. Для адаптеров нужен `GeneratedStrategiesWithAdapters([asm], [typeof(IRefuelTarget), typeof(IRefuelSource)], [])`.
 
-### B. `feature/tanker-refuel` (выбрана в экспериментальной интеграции)
-- `RefuelCommand(IRefuelTarget target, IRefuelSource source)`: `amount = min(source.RefuelAmount, source.FuelReserve)`; `target.Fuel += amount; source.FuelReserve -= amount` (отдаёт остаток, а не падает).
-- `IRefuelTarget{int Fuel{get;set;}}`, `IRefuelSource{int FuelReserve{get;set;}; int RefuelAmount{get;}}`.
-- `RegisterIoCDependencyRefuelContextCommand(depKey, targetRole, sourceRole)` (роли должны отличаться).
-- `Refuel.config` = одна строка `Context.Refuel`. Вызов: `Resolve<Lib.ICommand>("Commands.ContextAction", "Refuel", context)`, где `context = new CommandContext({Target: ship, Source: tanker})`.
-- Регистрация в тесте: `RegisterIoCDependencyGeneratedStrategiesWithAdapters([asm], [typeof(IRefuelTarget), typeof(IRefuelSource)], [])` → `RegisterIoCDependencyRefuelContextCommand("Context.Refuel","Target","Source")`.
-
-⚠ Имена файлов/классов `RefuelCommand`, `Refuel.config`, `RefuelTests` совпадают — ветки **нельзя слить вместе**.
-
----
-## 3.5 Shooting — `feature/shooting` (автор: maxximben)
+### 3.5 Стрельба
 
 | | |
 |---|---|
-| Команда | `ShootCommand(IShooting shooting)` (primary-constructor) |
-| Интерфейс | `IShooting{Position, Direction, ProjectileSpeed, ProjectileDamage, Ammo{get;set;}, ProjectileFactory, Storage, ExceptionFactory}` (последние три приходят через `ShootingDependencies.All`, а не из свойств объекта) |
-| Фабрика | `ProjectileFactory(IGameItemFactory, Func<IGameItem,Vector> velocity)`; регистрация `RegisterIoCDependencyProjectileFactory` → ключ `Factories.Projectile`; скорость берётся из `Properties.ComputedVelocity` |
-| Действие | `Config/Shooting.config` = `Commands.SpaceBattle_Lib_ShootCommand`; вызов `Commands.Action`, "Shooting", ship |
-| Регистрации в тесте | `ExceptionFactory`, `GameItemFactory`, `ComputedVelocity`, `ProjectileFactory`, `GameItemStorage(storage)`, `CodeGeneration`, `GeneratedStrategies(asm, ShootingDependencies.All)`, `Macro`, `ActionComposition`, `ActionConfigurations` |
-| Ошибки | `Ammo <= 0` → `InvalidOperationException("Not enough ammunition to shoot.")`; в `Create`: `ArgumentNullException`, `ArgumentOutOfRangeException` (speed/damage < 0), `ArgumentException` (`position.Dim != 2`) |
+| Команда | `ShootCommand(IShooting)` |
+| Интерфейс | `IShooting{Position, Direction, ProjectileSpeed, ProjectileDamage, Ammo get/set, ProjectileFactory, Storage, ExceptionFactory}`; последние три приходят через `ShootingDependencies.All`, а не из свойств предмета |
+| Фабрика | `ProjectileFactory(IGameItemFactory, Func<IGameItem,Vector>)`, ключ `Factories.Projectile` |
+| Действие | `Config/Shooting.config` = `Commands.SpaceBattle_Lib_ShootCommand` |
+| Ошибки | `Ammo <= 0` → `InvalidOperationException("Not enough ammunition to shoot.")`; в фабрике: `ArgumentNullException`, `ArgumentOutOfRangeException` (скорость/урон < 0), `ArgumentException` (`position.Dim != 2`) |
 | Тесты | `ShootingTests`, `ProjectileFactoryTests` |
 
-Замечания:
-- Актуальный tip `3ff48cf` включает SOLID-рефакторинг и `CompilerCacheIsolationTests`, кэш Roslyn больше не статический в этой ветке.
-- ProjectileFactory копирует Position через `new Vector(position.Coordinates)`, валидирует position/direction/speed/damage; созданный снаряд получает Id, Position, Direction, Speed, Damage, Destroyed, Velocity. **Kind не добавляется**: для снимков по схемам Kind нужна отдельная интеграция.
-- Ammo читается перед созданием снаряда и уменьшается после успешного `storage.Add`. Ошибка фабрики/добавления не расходует боезапас; полного транзакционного отката произвольного setter нет.
-- `IShooting.ExceptionFactory` пока остаётся в контракте и ShootingDependencies, хотя ShootCommand бросает InvalidOperationException напрямую.
+Снаряд — `IGameItem` со свойствами `Id, Position, Direction, Speed, Damage, Destroyed, Velocity`; кладётся в `Storage` по `Id`, `Ammo` уменьшается на 1. `Ammo` хранится в самом предмете (перенаправления через `Dependency` нет).
+
+### 3.6 Столкновения
+
+Файлы: `Collisions/{CollisionFile,CollisionOffset,CollisionTree}.cs`, `Commands/CollisionCommand.cs`, `Registration/RegisterIoCDependencyCollisions.cs`, `…CollisionContextCommand.cs`, `tools/collisions/*`.
+- Ошибка формата строки → `FormatException("Line N: expected 4 integers …")`. Каталог без таблиц → `DirectoryNotFoundException`. Несуществующее дерево → исключение IoC «not found».
+- Дерево строится лениво и кэшируется: повторный `Resolve` возвращает тот же объект.
+- Контекстная команда: двое по ролям + дерево + имя последствия (`ContextAction`).
+- Тесты (в ветках collisions/damage): `CollisionFileTests`, `CollisionTreeTests`, `CollisionCommandTests`, `CollisionRegistrationTests`, `CollisionContextCommandTests`.
+
+### 3.7 Урон (`feature/damage`)
+
+`ApplyDamageCommand(IDamageTarget{Health get/set}, IDamageSource{Damage})`, `DestroyIfDeadCommand(IDestructible{Health, Destroyed get/set})`, `RegisterIoCDependencyDamageContextCommand(depKey, targetRole, sourceRole)`. `Config/Hit.config` = `Context.ApplyDamage`, `Context.DestroyIfDead`.
+Полная сборка попадания: `RegisterIoCDependencyCollisionContextCommand("Commands.Hit.Collision", "Collisions.Ship-Torpedo", "Target", "Source", "Hit")`.
+
+### 3.8 Тики и шаг мира
+
+| Класс | Роль |
+|---|---|
+| `GameTicks : IGameTicks` | вызывает шаг мира с периодом `Step`; `Start()`, `Stop()`, `TickNumber`, `IsRunning`, `Failure` |
+| `DelayedCommandScheduler : IDelayedCommandScheduler` | планирует команду через заданное время |
+| `DeliverGameTickCommand`, `TickCommand` | доставка тика на поток игры |
+| `StartGameTicksCommand`, `StopGameTicksCommand` | команды запуска и остановки тиков |
+| `GameTickFactory` | создание `GameTicks`: `GameTicks.Create(step, worldStep, post[, maxCatchUp])` |
+
+Если тик запоздал, выполняется до `maxCatchUpTicks` пропущенных (по умолчанию 2). Проверка аргументов: `step > 0`, `maxCatchUpTicks ≥ 0`.
+
+**Шаг мира** (ветки `world-update`/`game-ticks`):
+- `WorldStepFactory` создаёт «кадр» — предмет со свойствами `Battle` и `Items` (снимок хранилища) — и вызывает действие `WorldStep` (`Commands.Action`).
+- Фазы задаются JSON: `{"phases":[{"name":"…","execution":"World"|"Items","action":"…","selector":"…"}]}`. `World` — действие над кадром; `Items` — действие для каждого предмета, прошедшего селектор (`Func<IGameItem,bool>` по ключу `selector`); для `World` селектор указывать нельзя.
+- Загрузка и регистрация: `RegisterIoCDependencyWorldPhaseConfigurationLoader` → `RegisterIoCDependencyConfiguredWorldPhases(path[, action])`. Дубли имён фаз и подмена `Commands.Action`/`Commands.Macro` запрещены (`FormatException`).
+- Возможное ограничение при интеграции: по более раннему аудиту добавление этих веток к серверному стеку упирается в архитектурный тест по папке `Scheduling` (не перепроверялось, уточнить при слиянии).
+
+### 3.9 Объектная авторизация (`Authorization/*`)
+
+| Класс | Роль |
+|---|---|
+| `AccessAreaTree` | дерево областей: `Add(area, parent?)`, `Move(area, parent?)`, `GetPath(area)`; перенос области ниже самой себя запрещён |
+| `ObjectAccessAreas` | привязка предмета к области (по ссылке): `Bind`, `Unbind`, `FindArea` |
+| `AccessGrantStore` | выданные разрешения (субъект, действие, область) |
+| `InheritedGrantRule` | `Allow`, если разрешение выдано в области предмета или любой родительской; иначе `Abstain` |
+| `AuthorizationPolicy` | `IsAllowed(subject, action, item)`: любой запрет — запрет; нужен хотя бы один `Allow` |
+| `AuthorizedActionCommand`, `AuthorizedActionFactory` | выполнить действие, если разрешено, иначе вызвать обработчик отказа |
+
+Ключи: `Authorization.Policy`, `Factories.AuthorizedAction`, `Commands.AuthorizedAction(subject, action, item)`. Субъект должен быть **доверенным** (из проверенного токена); к `Authentication/*` не привязано.
 
 ---
-## 3.6 Collisions — `feature/collisions`
+## Часть B. Серверный стек
 
-Файлы: `Collisions/{CollisionFile,CollisionOffset,CollisionTree}.cs`, `Commands/CollisionCommand.cs`,
-`Registration/RegisterIoCDependencyCollisions.cs`, `RegisterIoCDependencyCollisionContextCommand.cs`, `tools/collisions/*`.
-Ошибки формата строки → `FormatException("Line N: expected 4 integers (dx dy dvx dvy), got '...'")`.
-Несуществующий каталог → `DirectoryNotFoundException`; существующий пустой каталог просто не регистрирует деревьев (фабрика Commands.Collision регистрируется). Несуществующее дерево → `Exception` (IoC «not found»).
-Дерево строится **лениво** (`Lazy`) и кэшируется — повторный `Resolve` возвращает тот же объект. Тесты: `CollisionFileTests`, `CollisionTreeTests`, `CollisionCommandTests`, `CollisionRegistrationTests`, `CollisionContextCommandTests`.
+### 3.10 Игра
 
----
-## 3.7 Damage — `feature/damage` (⊃ collisions)
+- `Game(id, IGameQueue, IGameScope, IQuantum)`: `Post`, `HasCommands`, `Pending` (команды в очереди), `Execute()`.
+- `TimeQuantum(TimeSpan, TimeProvider)`: `duration < 0` → `ArgumentOutOfRangeException`; `Start()` запоминает момент; `IsOver` = прошло `≥ duration`. В тестах время подменяется `ManualTimeProvider`.
+- `Games.Create(id)`: свой `BattleContext`, свой IoC-скоуп, своя `Storages.GameItem`.
+- `GameRunner`, `PostToGameCommand` — см. [02-architecture.md](02-architecture.md) §6.
+- Тесты: `GameTests`, `GameRegistrationTests`, `TimeQuantumTests`, `GameRunnerTests`, `GameRunnerRegistrationTests`.
 
-`ApplyDamageCommand(IDamageTarget{Health{get;set;}}, IDamageSource{Damage})`, `DestroyIfDeadCommand(IDestructible{Health, Destroyed{get;set;}})`,
-`RegisterIoCDependencyDamageContextCommand(depKey, targetRole, sourceRole)`. `Config/Hit.config` = `Context.ApplyDamage`, `Context.DestroyIfDead`.
-Пример полной сборки столкновения в `DamageContextTests`: `Strike.config` = `Commands.Hit.Collision`, который регистрируется
-`RegisterIoCDependencyCollisionContextCommand("Commands.Hit.Collision", "Collisions.Ship-Torpedo", "Target", "Source", "Hit")`.
-Результат: попадание → `Hit` (урон + уничтожение).
+### 3.11 Серверный поток и очереди
 
----
-## 3.8 Game — `feature/game` (и в составе game-runner/messages/server-management)
+- `ICommandQueue`: `Add`, `AddFirst`, `TryAdd` (с учётом ёмкости), `Take` (блокирует), `TryTake`, `CompleteAdding`, `Count`; после `CompleteAdding` добавление → `InvalidOperationException`.
+- `BlockingCommandQueue` — простая FIFO; `PriorityCommandQueue` — по приоритету (`IPrioritizedCommand.Priority`, больше — раньше), внутри приоритета FIFO; `AddFirst` обгоняет всех.
+- `QueueScheduler` — FIFO запланированных игр (не потокобезопасен).
+- `ServerThread`: `Start`, `Add`, `Interrupt`, обработка исключений. `HardStopCommand`/`SoftStopCommand` проверяют, что выполняются потоком, которому предназначены.
+- Ёмкость ящика — `ServerOptions.InboxCapacity`. Когда поток не может принять сообщение, а также когда игра сейчас не в состоянии `Running` или буфер переноса полон, бросается `ServerOverloadedException` (HTTP 503 с `Retry-After: 1`).
+- Тесты: `ServerThreadTests`, `ServerThreadRegistrationTests`, `CommandCollectionsTests`, `PriorityQueueTests`.
 
-- `Game(id, IGameQueue, IGameScope, IQuantum) : IGame` — `Post(cmd)`, `HasCommands`, `Execute()`: войти в скоуп → `quantum.Start()` → выполнять команды, пока есть и квант не истёк (первая команда выполняется всегда).
-- `GameQueue` — обычная `Queue<ICommand>` (не потокобезопасная: доступ только из потока игры).
-- `TimeQuantum(TimeSpan duration, TimeProvider)`; `duration < 0` → `ArgumentOutOfRangeException`; `Start()` фиксирует `GetTimestamp()`; `IsOver` = `elapsed ≥ duration`.
-- `Games.Create(id)`: `BattleContextFactory.Create(id)` → новый `IoC.Scope.Create` → внутри `scope.Enter()` регистрируется `RegisterIoCDependencyBattleContext` → `new Game(...)`. То есть **у каждой игры свой IoC-скоуп и свой `Storages.GameItem`**.
-- `Games.Quantum` — `RegisterIoCDependencyGameQuantum(TimeSpan[, TimeProvider])`.
-- `GameDependencies` растёт вместе со стеком. В актуальной истории game → game-runner → messages → server-management; прежний конфликт этих веток относился к старым tips.
+### 3.12 Маршрутизация
 
----
-## 3.9 Server thread — `feature/server-thread`
+- `IHashFunction.Hash(string) → ulong`; `FnvHashFunction` (по умолчанию), `Sha256HashFunction`.
+- `ConsistentHashRing<TNode>(hash, replicas)`: `Add(id, node)` (дубль → `ArgumentException`), `Remove(id) → bool`, `Find(key)`, `Count`.
+- `BoundedLoadRouter<TNode>(ring, meter, tolerance, probes)`; `tolerance ≥ 0`, `probes ≥ 1`. `PlacementLoadMeter`, `PlannedMoves`, `PlanningRouter` учитывают игры, которые прямо сейчас переезжают.
+- Регистрация: `RegisterIoCDependencyRouting(replicas[, hash])` → `Routing.Ring`, `Routing.Thread(gameId)`; `RegisterIoCDependencyBoundedLoadRouting(tolerance, probes)` подменяет `Routing.Thread` и маршрут ребаланса.
+- Тесты: `ConsistentHashRingTests`, `FnvHashFunctionTests`, `Sha256HashFunctionTests`, `RoutingRegistrationTests`, `BoundedLoadRouterTests`, `BoundedLoadRoutingRegistrationTests`, `PlacementLoadMeterTests`, `PlannedMovesTests`.
 
-`ICommandQueue` (`BlockingCommandQueue`): `Add`, `AddFirst`, `Take` (блокирует), `TryTake`, `CompleteAdding`, `Consume()` (ленивый перебор до закрытия), `Count`; после `CompleteAdding` `Add` → `InvalidOperationException`. Сейчас есть `TryAdd` и capacity; Add/AddFirst используются для служебных команд и не ограничены capacity.
-`IScheduler` (`QueueScheduler`): FIFO для «запланированных» команд (игры).
-`ServerThread` — см. архитектуру §6. `ServerThreads.Create` → новый поток (очередь, цикл, планировщик, обработчик исключений, фабрика исключений).
-`HardStopCommand`/`SoftStopCommand` валидируют `Environment.CurrentManagedThreadId == thread.ThreadId`.
-Тесты: `ServerThreadTests`, `ServerThreadRegistrationTests`, `CommandCollectionsTests`; дублёры `SpyCommandQueue`, `RecordingExceptionHandler`, `StubServerThread`.
+### 3.13 Сообщения
 
----
-## 3.10 Routing — `feature/routing`
+- `JsonMessageParser.Parse(text)` → `IMessage{GameId, Command, Args}`. Не JSON, не объект, нет строки `gameId`/`command` → `MessageFormatException`.
+- `MessageReceiver.Receive(text)`: разбор → поиск игры → `Send`. Неизвестная игра → `KeyNotFoundException("The game "X" is not running on this server.")`.
+- `GameRegistry` — `ConcurrentDictionary`; дубль `gameId` → `ArgumentException`.
+- `IoCMessageInterpreter` резолвит `Messages.Command.<command>`. Из коробки есть только `CreateItem`; остальные регистрирует приложение.
+- Тесты: `JsonMessageParserTests`, `MessageReceiverTests`, `GameRegistryTests`, `MessagesRegistrationTests`, `CommandWhitelistTests`, `MessageDecoratorRegistrationTests`.
 
-`IHashFunction.Hash(string) → ulong`; `ConsistentHashRing<TNode>(hash, replicas)`: `Add(id,node)` (дубль → `ArgumentException`), `Remove(id)→bool`, `Find(key)` (пустое кольцо → `InvalidOperationException("The ring has no nodes.")`), `Count`.
-Позиции узла: `hash($"{id}#{replica}")`; при коллизии выигрывает меньший `id`. Поиск — `BinarySearch` с переходом по кругу.
-`RegisterIoCDependencyRouting(replicas[, hash])` → `Routing.Ring`, `Routing.Thread(gameId)`. По умолчанию FnvHashFunction; Sha256HashFunction — доступная альтернатива. Тестовый дублёр `FakeHashFunction`. Тесты: `ConsistentHashRingTests`, `Sha256HashFunctionTests`, `FnvHashFunctionTests`, `RoutingRegistrationTests`.
+### 3.14 Сервер
 
----
-## 3.11 Game runner — `feature/game-runner`
+- `Server` + состояния (`Servers/States/*`) — описаны в [02-architecture.md](02-architecture.md) §9.
+- `IServer = IServerLifecycle + IServerThreads + IServerAvailability`.
+- Регистрация: `RegisterIoCDependencyServer(threadCount)` → `Server.Instance` и команды `Server.Start`, `Server.SoftStop`, `Server.HardStop` (`Resolve<Lib.ICommand>(key).Execute()`). Команды: `StartServerCommand`, `SoftStopServerCommand`, `HardStopServerCommand`.
+- Потребители проверяют состояние через `IsRunning` / `EnsureRunning()`.
+- Тесты: `ServerTests`, `ServerRegistrationTests`.
 
-`GameRunner(IGame, IServerThread)` — `Post(cmd)`: кладёт в игру и (однократно, флаг `_scheduled`) планирует себя на потоке; `Execute()`: прогнать игру, затем (в `finally`) перепланировать, если в игре остались команды — так игра получает кванты по очереди с другими.
-`PostToGameCommand(runner, command)`. Ключи `Games.Runner(game, thread)`, `Games.Post(runner, cmd)`. Тесты: `GameRunnerTests`, `GameRunnerRegistrationTests`.
+### 3.15 Предметы и снимки
 
----
-## 3.12 Messages — `feature/messages`
+| Файл | Роль |
+|---|---|
+| `Items/ItemCreator.cs` | `Create(kind, id, props)`; `Id`/`Kind` в `props` запрещены |
+| `Items/CreateItemCommand.cs`, `CreateItemMessageCommand.cs` | создание предмета из сообщения `CreateItem` |
+| `Serialization/JsonValueCodec.cs` | значения с тегами типов |
+| `Serialization/ItemSerializer.cs`, `IoCItemSchema.cs` | предмет ↔ JSON по схеме вида |
+| `Serialization/CommandJsonSerializer.cs`, `MessageCommandSerializer.cs` | команды очереди ↔ JSON |
+| `Serialization/SnapshotGameCommand.cs`, `RestoreItemsCommand.cs` | снимок и восстановление |
 
-Формат сообщения (JSON-объект): `{"gameId": "<non-empty string>", "command": "<non-empty string>", "args": <любой JSON, необязателен>}`.
-Нарушения → `MessageFormatException : FormatException` (не JSON / не объект / нет строки `gameId`/`command`).
-`MessageReceiver.Receive(text)` → parse → `GameRegistry.Find(gameId).Send(msg)`; неизвестная игра → `KeyNotFoundException("The game \"X\" is not running on this server.")`.
-`IoCMessageInterpreter` резолвит `Messages.Command.<command>` (прикладные команды регистрируются отдельно; начиная с game-items есть встроенный CreateItem).
-`GameRegistry` — `ConcurrentDictionary`, дубль `gameId` → `ArgumentException`.
-Тесты: `JsonMessageParserTests`, `MessageReceiverTests`, `GameRegistryTests`, `MessagesRegistrationTests`.
+Сообщение `CreateItem`: `{"gameId":"g","command":"CreateItem","args":{"kind":"Ship","id":"s1","properties":{"Fuel":{"type":"int","value":10},"Owner":{"type":"string","value":"p1"}}}}`. Нет `kind` или `id` → `MessageFormatException`.
 
----
-## 3.13 Server — `feature/server-management`
+Тесты: `GameSnapshotTests`, `GameItemCreationTests`, `FileSnapshotStoreTests`.
 
-`Server(ring, createThread, softStop, hardStop, threadCount, prefix="Thread")`; публичный IServer объединяет IServerLifecycle/IServerThreads/IServerAvailability: IsRunning, ThreadCount, EnsureRunning, Start, AddThread и async stop;
-повторный `Start` / стоп после стопа → `InvalidOperationException`; `AddThread` после перехода в ClosedServerState → `InvalidOperationException("The server is stopping.")`.
-`RegisterIoCDependencyServer(threadCount)` → `Server.Instance`, `Server.Start`, `Server.SoftStop`, `Server.HardStop` (три последних — **команды**: `Resolve<Lib.ICommand>(key).Execute()`).
-Тесты: `ServerTests`, `ServerRegistrationTests`; актуальные tips переведены на async-ожидания. В свежем стеке сервер реализован через `Servers/States/*`, узкие интерфейсы и выделенный сервис удаления потока.
+Регистрации: `RegisterIoCDependencyGameSnapshot` (кодек, типы значений, `Games.Snapshot`, `Games.Restore`), `RegisterIoCDependencyGameItems` (`Items.Create`, `Messages.Command.CreateItem`), `RegisterIoCDependencyItemKind(kind, свойства)`, `RegisterIoCDependencyValueType<T>(тег, write, read)`.
 
-### Минимальный запуск сервера целиком (из `ServerRegistrationTests`)
+### 3.16 Управляемые игры, перенос, ребаланс, удаление потока
 
-```csharp
-new InitCommand().Execute();
-Ioc.Resolve<App.ICommand>("IoC.Scope.Current.Set", Ioc.Resolve<object>("IoC.Scope.Create")).Execute();
-new RegisterIoCDependencyExceptionFactory().Execute();
-Register(ServerThreadDependencies.ExceptionHandler, _ => myHandler);          // IExceptionHandler — обязателен
-new RegisterIoCDependencyBattleContextFactory().Execute();
-new RegisterIoCDependencyGameQuantum(TimeSpan.FromHours(1)).Execute();
-new RegisterIoCDependencyGame().Execute();
-new RegisterIoCDependencyServerThread().Execute();
-new RegisterIoCDependencyGameRunner().Execute();
-new RegisterIoCDependencyRouting(16).Execute();                               // 16 виртуальных узлов
-new RegisterIoCDependencyMessages().Execute();
-Register(MessageDependencies.CommandKey("Echo"), args => /* ICommand */);     // команды протокола — свои
-new RegisterIoCDependencyServer(4).Execute();                                 // 4 потока
+| Класс | Роль |
+|---|---|
+| `GameRuntime` | фасад: `Start(id)`, `Find`, `Games`, `SnapshotAndStop(store)`, `Restore(store)`, `AddThread`, `Rebalance`, `RemoveThread(id)`, `Transfer(id, destination)`, `Receive(snapshot)`, `Send(message)` |
+| `ManagedGameRegistry`, `ManagedGameHost` | реестр игр и хост игры (`State`, `Thread`, `BeginTransfer`, `CommitTransfer`, `CancelTransfer`, `Relocate`) |
+| `GameHostLifecycle`, `GameHostTransferService` | состояние и буфер сообщений во время переезда |
+| `GameLifecycle` | запуск и восстановление игр |
+| `GameSnapshotService` | снимок и восстановление всех игр, `FileSnapshotStore` |
+| `GameTransferService` | перенос на другой сервер, `IRemoteServer` |
+| `GameRebalanceService` | добавление потока и перераспределение |
+| `ThreadRemovalService` | эвакуация игр и удаление потока |
 
-Ioc.Resolve<Lib.ICommand>(ServerDependencies.Start).Execute();
-Ioc.Resolve<IGameHost>(GameDependencies.Start, "Battle-1");                   // создать и зарегистрировать игру
-Ioc.Resolve<IMessageReceiver>(MessageDependencies.Receiver)
-   .Receive("""{"gameId":"Battle-1","command":"Echo","args":{"text":"hi"}}""");
-Ioc.Resolve<Lib.ICommand>(ServerDependencies.SoftStop).Execute();
-```
+Одновременно допускается одна операция над топологией (замок `lifecycle`); перенос и приём при занятом замке отвечают `ServerOverloadedException`.
+Тесты: `GameTransferTests`, `GameTransferFailureTests`, `ThreadRebalanceTests`, `ThreadRemovalTests`, `ServerSnapshotTests`, `ManagedGameValidationTests`, `RuntimeAbstractionTests`, `HostCompositionCoverageTests`, `ServerHostTests`.
 
----
-## 3.14 Снимок игры — `feature/game-snapshot`
+### 3.17 Обработка ошибок
 
-Основные файлы: `Serialization/{SnapshotGameCommand,RestoreItemsCommand,ItemSerializer,IoCItemSchema,JsonValueCodec,CommandJsonSerializer,MessageCommandSerializer}.cs`, регистрации `GameSnapshot` и `ValueType<T>`.
+- `ErrorAction { Retry, Skip, StopGame, StopThread }`.
+- `ExceptionErrorPolicy(rules)`: `Decide(error, attempt)`; правило по точному типу исключения, затем по базовому, иначе `Skip`; `Retry` после исчерпания попыток превращается в `Skip`.
+- `ErrorPolicyCommand(action, recovery)`: выполняет действие и при исключении делегирует `IErrorRecovery`. Реализации действий: `RetryErrorAction`, `SkipErrorAction`, `StopGameErrorAction`, `StopThreadErrorAction`, `StopCurrentThreadErrorAction`.
+- `ILog` (`MemoryLog`, `LoggingExceptionHandler`, в HTTP — `ApplicationLog`): записывает игру, исключение, решение и номер попытки.
+- Ключи: `Errors.Policy`, `Errors.Log`, `Messages.Decorate` (подключение к конвейеру).
+- Политика применяется только к командам-сообщениям. Тесты: `ErrorPolicyTests`, `ErrorRecoveryRegressionTests`, `ThreadErrorRecoveryTests`.
 
-`Games.Snapshot(game, Action<string> sink)` возвращает команду. При её исполнении в игровом скоупе сериализуются id игры, объекты storage и оставшаяся очередь. `Games.Restore(json)` создаёт игру, ставит первой RestoreItemsCommand, затем восстанавливает сериализуемые команды. До исполнения восстановленной игры storage ещё не обязан содержать восстановленные объекты.
+### 3.18 HTTP (`SpaceBattle.Http`)
 
-Свойства объектов выбирает `Serialization.Schema.<Kind>`; Id/Kind служат идентичностью. Значение кодируется парой type/value через registry codecs: int, long, double, bool, string, angle, vector и зарегистрированные расширения. Неизвестные Kind/тип/команда требуют регистрации, а не молчаливого пропуска. Для дополнительных команд есть `ICommandSerializer`; один MessageCommandSerializer не сериализует любую игровую команду.
-
-Тесты: `GameSnapshotTests`. Пределы: это JSON-состояние игры и очереди, не снимок задач, таймеров, сети или IoC-контейнера целиком.
-
-## 3.15 Создание объектов — `feature/game-items`
-
-`Items/{ItemCreator,CreateItemCommand,CreateItemMessageCommand}.cs`; `RegisterIoCDependencyGameItems`, `RegisterIoCDependencyItemKind`. `ItemCreator` создаёт объект по kind/id/properties, добавляет Id и Kind и помещает в storage текущего боя. Дубликат id отклоняется.
-
-Протокол `CreateItem`: `args.id`, `args.kind`, `args.properties`; каждое значение properties кодировано через `{type,value}`. Например: `{"Fuel":{"type":"int","value":10}}`. `Items.Create(kind,id,properties)` возвращает IGameItem и **сразу** создаёт объект; командный путь — Messages.Command.CreateItem. Схема Kind определяет сохраняемые свойства и регистрируется отдельно. Тесты: `GameItemCreationTests`.
-
-## 3.16 Снимки сервера — `feature/server-snapshot`
-
-Новый `Runtime/*`: ManagedGame/Host, состояния host, GameRuntime, реестр, сервисы жизненного цикла и снимков. Интерфейсы отделяют реестр, starter, host lifecycle и runtime. `RegisterIoCDependencyManagedGames` переключает текущий скоуп на дочерний; добавляет сервисные ключи и заменяет стандартные Games.Create/Start/Registry для managed games.
-
-`SnapshotAndStop(store)` ставит игровые барьеры, приостанавливает игры, сохраняет снимки работающих игр и делает soft stop. При сбое сохранения возвращает доступные игры в работу. `Restore(store)` проверяет дубликаты id и запускает восстановление. Есть `MemorySnapshotStore`; файловое хранилище приходит в server-host. Replacement store заменяет весь набор, поэтому уже перенесённые/удалённые игры не остаются в следующем снимке.
-
-Тесты: `ServerSnapshotTests`, `ManagedGameValidationTests`, `RuntimeAbstractionTests`, `CompilerCacheIsolationTests`. Кэш Roslyn в этой линии изолирован по экземплярам.
-
-## 3.17 Межсерверный перенос — `feature/game-transfer`
-
-`GameTransferService` управляет межсерверным протоколом, `GameHostTransferService` — буфером/состоянием source host; `GameTransfer`/`IGameArrival` фиксируют или отменяют прибытие. Host остаётся доступным по прежнему id после переноса, но пересылает сообщения на destination.
-
-Порядок: захват lifecycle без ожидания → BeginTransfer/pause → snapshot → Receive на target → Commit буфера → Moved/proxy. До commit сбой откатывает target и возобновляет source. Перенос на себя, занятый target и повторный id отклоняются. Переполнение transfer buffer даёт `ServerOverloadedException`. Политика буфера задана регистрацией; служебные барьеры не должны зависеть от свободного места в пользовательском inbox.
-
-Тесты: `GameTransferTests`, `GameTransferFailureTests`. `IRemoteServer` — внедряемый контракт, готового HTTP-клиента транспорта в этой ветке нет.
-
-## 3.18 Балансировка и удаление потоков
-
-`feature/thread-rebalance`: `GameRebalanceService`, `IGameRebalanceService`, фасад `GameRuntime.Rebalance`. Добавить поток → обновить ring → найти игры с новым target → pause/snapshot/restore/relocate с сохранением идентичности host для клиентов. Ошибка переносимой игры вызывает CancelTransfer.
-
-`feature/remove-thread`: `ThreadRemovalService`, `ServerThreadRemovalService`, `ServerThreadMember`, интерфейсы членства и управления потоками, классы состояний сервера. Удаляемый поток исключается из размещения до эвакуации; последний поток не удаляется; после удачной эвакуации — soft stop. Есть восстановление членства при ошибке.
-
-Тесты: `ThreadRebalanceTests`, `ThreadRemovalTests`; в свежем стеке — также `ServerLifetimeAbstractionTests`. Простой вызов Server.AddThread и runtime.AddThread — разные уровни: перенос существующих игр делает runtime.
-
-## 3.19 Приоритеты — `feature/priority-queue`
-
-`Scheduling/PriorityCommandQueue.cs`: `IPrioritizedCommand.Priority`, wrapper `PrioritizedCommand`. Больший int означает более раннее выполнение; одинаковые priorities — FIFO по sequence под lock. `AddFirst` — отдельная срочная дорожка (новые urgent раньше предыдущих). Обычная команда имеет priority 0.
-
-`TryAdd` учитывает capacity; Add/AddFirst нужны для служебной доставки и обходят ограничение. `RegisterIoCDependencyPriorityThreads(capacity)` заменяет стратегию ServerThreads.Create. Тесты: `PriorityQueueTests`.
-
-## 3.20 Whitelist — `feature/command-whitelist`
-
-`CommandWhitelist`, `WhitelistMessageInterpreter`, `WhitelistMessageReceiver`; `RegisterIoCDependencyCommandWhitelist(names)`. Множество имён сравнивается Ordinal; незаданные команды запрещены, пустые имена настроек отклоняются. Receiver проверяет до приёма, interpreter — перед исполнением, включая команды после restore/переноса.
-
-Публичная точка композиции — `Messages.Decorate(Func<IMessageInterpreter,IMessageInterpreter>)`; receiver с валидацией — `Messages.ValidatedReceiver`. В HTTP-host используется AuthenticatedMessageReceiver со своим предварительным whitelist. Тесты: `CommandWhitelistTests`, `MessageDecoratorRegistrationTests`.
-
-## 3.21 Ошибки — `feature/error-policy`
-
-`ExceptionErrorPolicy`, `ErrorPolicyCommand`, `ErrorRecovery`, `IErrorAction` и отдельные Retry/Skip/StopGame/StopThread actions. Конфигурация: тип исключения → `(ErrorAction, Retries)`, отрицательные retries запрещены. Default — Skip; повтор исчерпан → Skip. `ILog`/MemoryLog записывают game id, exception, действие и попытку.
-
-Игровые ошибки перехватываются через PolicyMessageInterpreter; State для паузы/остановки отделён от управления host. В server-host добавлены DeferredExceptionHandler, LoggingExceptionHandler и StopCurrentThreadErrorAction для ошибок непосредственно команд потока. Не путать эти два пути.
-
-Тесты: `ErrorPolicyTests`, `ErrorRecoveryRegressionTests`; позже `ThreadErrorRecoveryTests`. Retry повторно выполняет действие без транзакции: безопасность повтора зависит от команды.
-
-## 3.22 JWT — `feature/auth`
-
-`PlayerIdentity(PlayerId,GameId,CanTransfer)`, `IPlayerTokenValidator`, `JwtPlayerTokenValidator`, `AuthenticatedMessage`, `AuthenticatedCommandSerializer`.
-
-`RegisterIoCDependencyJwtAuthentication(issuer,audience,secret)` регистрирует Auth.Validator и Messages.Authenticate, вставляет authenticated serializer перед обычным message serializer. Допустим только подписанный HS256; проверяются issuer/audience/exp/signature, обязательны ровно один sub и один game; clock skew = 0; ключ минимум 32 UTF-8 байта. `permission=transfer` разрешает endpoint переноса.
-
-Сообщение должно принадлежать игре из токена. PlayerId сохраняется в snapshot без повторного доверия входному JSON. Токены приложение не выдаёт. Тесты: `AuthenticationTests`.
-
-## 3.23 HTTP — `feature/http-api`
-
-Проект `SpaceBattle.Http`, ASP.NET Core minimal endpoints, public partial Program для тестового host. AuthenticatedMessageReceiver проверяет game/identity и whitelist, затем отдаёт сообщение runtime.
-
-| Endpoint | Успех | Основные отказы |
+| Эндпоинт | Запрос | Ответы |
 |---|---|---|
-| `POST /messages` с Bearer и JSON сообщения | 202, принято в обработку | 400 формат/whitelist; 401 JWT; 403 другая game; 404 игра; 503 перегрузка + Retry-After |
-| `POST /games/{id}/transfer`, `{"destination":"name"}` | 204 после переноса | 401 JWT; 403 другая игра/нет transfer; 400 формат; 404 неизвестный destination; 503 занято/буфер; 502 IOException |
+| `POST /messages` | заголовок `Authorization: Bearer <JWT>`; тело — JSON-сообщение `{gameId, command, args}` | `202` принято; `401` нет или неверен токен; `403` токен другой игры / нет права; `400` неверный формат, JSON или команда не из белого списка; `404` игра не найдена; `503` + `Retry-After: 1` сервер перегружен |
+| `POST /games/{id}/transfer` | то же + тело `{"destination": "<имя сервера>"}`; токен должен быть для игры `{id}` и содержать право `transfer` | `204` готово; `401`; `403`; `400`; `404` неизвестный получатель; `502` ошибка связи с получателем; `503` занят |
 
-202 подтверждает admission, а не результат команды: права на объект/ошибки команды проверяются позже в игровом потоке. Иных endpoint управления играми/потоками или выдачи JWT нет. Тесты: `HttpApiTests`, `HttpTransferFailureTests`; GameApiFactory предоставляет тестовый host.
+Имена серверов-получателей приложение задаёт словарём `IReadOnlyDictionary<string, IRemoteServer>` (в `HostComposition` по умолчанию пуст: переносить некуда, пока он не заполнен).
+Настройки сервера — секция `Server` в `appsettings.json` (см. [07-playbook.md](07-playbook.md) §1).
+Тесты: `HttpApiTests`, `HttpTransferFailureTests`, `ServerLifetimeAbstractionTests` (на базе `Microsoft.AspNetCore.Mvc.Testing`); сквозной тест жизненного цикла — в ветке `test/server-e2e`.
 
-## 3.24 Запускаемое приложение — `feature/server-host`
+### 3.19 Права игрока (`Authentication/*`)
 
-`HostComposition.Configure` связывает options, ServerComposition, IServerApplication, логирование, HttpGameServices и hosted service. `ServerApplication.Start` запускает потоки, при необходимости восстанавливает snapshot, создаёт отсутствующие configured Games; ошибка старта завершает сервер. `Stop` идемпотентно возвращает одну stopping task и ожидает снимок/soft stop.
+| Класс | Роль |
+|---|---|
+| `JwtPlayerTokenValidator` | проверка подписи, срока, издателя, аудитории; результат `PlayerIdentity` |
+| `AuthenticatedMessageReceiver` | разбор, сверка игры токена, белый список, отправка |
+| `PlayerAuthorizationInterpreter`, `PlayerAuthorizationCommand` | проверка прав перед выполнением команды |
+| `PlayerCommandPermissions`, `PlayerItemPermissions` | какие команды и предметы доступны игроку |
+| `TargetItemResolver` | достаёт идентификатор предмета из `args` по `CommandTargets` |
+| `ExistingItemOwnerRule`, `NewItemOwnerRule` | правила `existing-owner` и `new-owner` |
+| `ScopedItemOwners` | определяет владельца предмета по хранилищу игры |
+| `OwnerClaim` | читает `args.properties.Owner` (тип `string`) из сообщения `CreateItem` |
 
-`ServerOptions`: ThreadCount, InboxCapacity, RingReplicas, QuantumMilliseconds, PriorityQueues, Games, AllowedCommands, ItemKinds, SnapshotOnStop, RestoreOnStart, SnapshotPath, JwtIssuer/Audience/Secret. В потомке player-authorization дополнены CommandTargets, Players, CommandAccessRules. Ключ JWT по умолчанию пуст — для запуска обязателен внешний параметр.
-
-`FileSnapshotStore` реализует ISnapshotBatchStore: SaveAll заменяет весь набор через временный файл (отдельный ISnapshotReplacementStore реализован memory store). Таблица remote destinations по умолчанию пуста. Пример appsettings содержит demo/CreateItem, но не является полной конфигурацией player permissions в потомках.
-
-Тесты: `ServerHostTests`, `FileSnapshotStoreTests`, `HostCompositionCoverageTests`, `ServerLifetimeAbstractionTests`, `ThreadErrorRecoveryTests`. Команды запуска и параметры — [07](07-playbook.md).
-
-## 3.25 Права игрока и E2E
-
-`feature/player-authorization`: `PlayerCommandRules`, `PlayerCommandPermissions`, `TargetItemResolver`, `PlayerItemPermissions`, `ScopedItemOwners`, `ExistingItemOwnerRule`, `NewItemOwnerRule`, `OwnerClaim`. Порядок проверки: команда разрешена игроку → target id из CommandTargets → объект разрешён игроку → access rules. Правила назначаются по команде, могут заменяться конфигурацией через `Auth.AccessRule.<name>`. Стандартные имена правил: existing-owner и new-owner. В Items игрока допускается "*" для любых id, но проверка владения остаётся.
-
-Existing-owner сверяет Owner в storage игры, new-owner — Owner из properties CreateItem с authenticated PlayerId. Нет автоматического разрешения «любому игроку с валидным JWT». Проверка при каждом исполнении, без service locator в командах. Тесты: `PlayerAuthorizationTests`, `AccessRuleConfigurationTests`.
-
-`test/server-e2e` добавляет `ServerEndToEndTests`: два игрока, создание объектов, переполнение inbox и 503, буферизация во время переноса, проксирование, snapshot/restore с Owner и продолжение работы, остановка. В сценарии прикладной AddFuel зарегистрирован тестом — это не встроенная HTTP-команда продукта. `ServerRuntimeArchitectureTests` проверяет отсутствие IoC/new в runtime-папках.
-
-## 3.26 Ограничение нагрузки — `feature/bounded-load-routing`
-
-Самостоятельный серверный стек на базе game-items, с версиями host/transfer/policies/auth, отличными от свежих tips. Классы: `IRouter<TNode>`, `ILoadMeter<TNode>`, `BoundedLoadRouter<TNode>`, `PlacementLoadMeter<TNode>`, `PlannedMoves<TNode>`, `PlanningRouter<TNode>`.
-
-При размещении исключает текущий game key из подсчёта, рассчитывает потолок по числу игр и tolerance, проверяет до probes кандидатов кольца; если все заполнены — берёт минимальную нагрузку из проверенных. Планируемые перемещения считаются на target, чтобы серия решений не переполнила один поток. Регистрация заменяет Routing.Thread и маршрут runtime. Не измеряет CPU/задержки.
-
-Тесты: `BoundedLoadRouterTests`, `BoundedLoadRoutingRegistrationTests`, `PlacementLoadMeterTests`, `PlannedMovesTests`. Для слияния со свежим E2E-стеком есть два конфликта, см. [01](01-branches.md); эта ветка не включает свежую player-authorization.
-
-## 3.27 Тики и обновление мира
-
-`feature/game-ticks`: GameTicks, GameTickFactory, Tick/Start/Stop/DeliverGameTickCommand, DelayedCommandScheduler. Factory получает TimeSpan step, worldStep, callback постановки команды в игру и maxCatchUpTicks (default 2). Step > 0; maxCatchUpTicks >= 0. Timer доставляет команду, а состояние мира изменяет игровой поток. Start/Stop защищены поколением; stale deliveries игнорируются. Ошибка worldStep или доставки останавливает расписание и сохраняет Failure.
-
-Тесты: `GameTicksTests`, `GameTickRegistrationTests`, `DelayedCommandSchedulerTests`; детерминированные часы в TickTestClock. Ветка не содержит GameRuntime/HTTP — интеграция через callback.
-
-`feature/world-update`: WorldStepCommand/Factory формируют frame с Battle и снимком Items, затем исполняют именованное действие WorldStep. ForEachWorldItemCommand применяет действие к выбранным объектам этого снимка; добавленные во время шага объекты не появляются в исходном списке задним числом.
-
-JSON фаз: `{ "phases": [{ "name": "move", "execution": "items", "action": "Movement", "selector": "Selectors.Moving" }] }`. Для режима world selector запрещён, для items обязателен; неизвестные/повторные поля, имена фаз и режимы отклоняются. Дополнительные execution modes внедряются при регистрации loader. Имена IoC шагов имеют префикс и длину имени внешнего действия, чтобы не перезаписывать произвольные ключи.
-
-Тесты: `WorldStepTests`, `WorldPhaseConfigurationTests`, `WorldStepTickIntegrationTests`. Готовых игровых конфигов физики и автоматического подключения к HTTP-host нет.
-
-## 3.28 Дерево областей доступа — `feature/object-authorization`
-
-`Authorization/{AccessAreaTree,ObjectAccessAreas,AccessGrantStore,InheritedGrantRule,AuthorizationPolicy,AuthorizationDecision}`, `AuthorizedActionFactory/Command` и `RegisterIoCDependencyAuthorizedActions`.
-
-AccessAreaTree хранит пути, разрешает перенос поддерева и запрещает циклы/неизвестного родителя. ObjectAccessAreas связывает конкретный объект с областью. Grant имеет subject/action/area и наследуется потомками области. InheritedGrantRule возвращает Allow либо Abstain; общий policy разрешает только при наличии Allow и отсутствии Deny/некорректного решения. Без правил разрешения нет.
-
-`Commands.AuthorizedAction(subject,action,item)` создаёт обёртку, которая проверяет актуальные права при Execute, затем создаёт и исполняет Commands.Action. Субъект должен поступить из доверенного источника; сама ветка JWT не проверяет. Ошибка прав не создаёт вложенное действие. Тесты: `ObjectAuthorizationTests`.
-
-Это отдельный механизм от player-authorization, пока без автоматического HTTP adapter и общей конфигурации с Players/CommandTargets.
+Ошибки: `UnauthorizedAccessException` (HTTP 403) для всех отказов. Тесты: `AuthenticationTests`, `PlayerAuthorizationTests`, `AccessRuleConfigurationTests`.
