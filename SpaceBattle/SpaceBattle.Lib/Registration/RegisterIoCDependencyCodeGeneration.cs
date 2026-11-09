@@ -9,7 +9,7 @@ public class RegisterIoCDependencyCodeGeneration : ICommand
         var finder = new CommandFinder();
         var adapters = new AdapterSourceBuilder();
         var strategies = new StrategySourceBuilder();
-        var compiler = new RoslynSourceCompiler();
+        var compiler = new RoslynSourceCompiler(new System.Collections.Concurrent.ConcurrentDictionary<string, System.Reflection.Assembly>());
 
         Register("CodeGeneration.CommandFinder", args => finder);
         Register("CodeGeneration.AdapterSourceBuilder", args => adapters);

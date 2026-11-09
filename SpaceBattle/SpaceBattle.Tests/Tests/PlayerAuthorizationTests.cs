@@ -45,12 +45,16 @@ public class PlayerAuthorizationTests
     [Fact]
     public void Creation_Cannot_Forge_Another_Players_Ownership()
     {
-        var rules = new PlayerCommandRules(new Dictionary<string, string> { ["CreateItem"] = "id" },
-            new Dictionary<string, (IReadOnlySet<string>, IReadOnlySet<string>)> { ["p"] = (new HashSet<string> { "CreateItem" }, new HashSet<string> { "s" }) });
+        var rules = new PlayerCommandRules(
+            new PlayerCommandPermissions(new Dictionary<string, IReadOnlySet<string>> { ["p"] = new HashSet<string> { "CreateItem" } }),
+            new TargetItemResolver(new Dictionary<string, string> { ["CreateItem"] = "id" }),
+            new PlayerItemPermissions(new Dictionary<string, IReadOnlySet<string>> { ["p"] = new HashSet<string> { "s" } }),
+            new Dictionary<string, IReadOnlyList<IAccessRule>> { ["CreateItem"] = new IAccessRule[] { new NewItemOwnerRule() } });
         var message = new AuthenticatedMessage(new Message("a", "CreateItem", JsonSerializer.SerializeToElement(new
         {
-            id = "s", properties = new { Owner = new { type = "string", value = "other" } }
+            id = "s",
+            properties = new { Owner = new { type = "string", value = "other" } }
         })), "p");
-        Assert.Throws<UnauthorizedAccessException>(() => rules.Validate(message, new GameItemStorage()));
+        Assert.Throws<UnauthorizedAccessException>(() => rules.Validate(message, new ScopedItemOwners(() => new GameItemStorage())));
     }
 }

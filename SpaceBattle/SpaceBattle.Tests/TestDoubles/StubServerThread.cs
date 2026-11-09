@@ -7,6 +7,7 @@ public sealed class StubServerThread(string name) : IServerThread
     public string Name { get; } = name;
 
     public int ThreadId => 0;
+    public bool IsStopping => false;
 
     public Task Start() => throw new NotSupportedException();
 
