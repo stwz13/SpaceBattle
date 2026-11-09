@@ -5,8 +5,9 @@ public class Game : IGame
     private readonly IGameQueue _queue;
     private readonly IGameScope _scope;
     private readonly IQuantum _quantum;
+    private readonly Func<bool>? _canExecute;
 
-    public Game(string id, IGameQueue queue, IGameScope scope, IQuantum quantum)
+    public Game(string id, IGameQueue queue, IGameScope scope, IQuantum quantum, Func<bool>? canExecute = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         ArgumentNullException.ThrowIfNull(queue);
@@ -16,6 +17,7 @@ public class Game : IGame
         _queue = queue;
         _scope = scope;
         _quantum = quantum;
+        _canExecute = canExecute;
     }
 
     public string Id { get; }
@@ -41,6 +43,6 @@ public class Game : IGame
     }
 
     private IEnumerable<ICommand> Slice() => Enumerable.Range(0, int.MaxValue)
-        .TakeWhile(index => _queue.HasCommands && (index == 0 || !_quantum.IsOver))
+        .TakeWhile(index => (_canExecute?.Invoke() ?? true) && _queue.HasCommands && (index == 0 || !_quantum.IsOver))
         .Select(_ => _queue.Dequeue());
 }

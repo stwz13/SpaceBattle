@@ -7,7 +7,15 @@ namespace SpaceBattle.Lib;
 
 public class RoslynSourceCompiler : ISourceCompiler
 {
-    private static readonly ConcurrentDictionary<string, Assembly> _compiled = new();
+    private readonly ConcurrentDictionary<string, Assembly> _compiled;
+
+    public RoslynSourceCompiler() : this(new ConcurrentDictionary<string, Assembly>()) { }
+
+    public RoslynSourceCompiler(ConcurrentDictionary<string, Assembly> compiled)
+    {
+        ArgumentNullException.ThrowIfNull(compiled);
+        _compiled = compiled;
+    }
 
     public Assembly Compile(string source, IEnumerable<Assembly> references)
     {
