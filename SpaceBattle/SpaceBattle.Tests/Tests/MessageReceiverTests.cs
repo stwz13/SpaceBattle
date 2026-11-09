@@ -62,6 +62,8 @@ public class MessageReceiverTests
 
         public void Post(Lib.ICommand command) => Posted.Add(command);
 
+        public void Wake() => throw new NotSupportedException();
+
         public void Execute() => throw new NotSupportedException();
     }
 

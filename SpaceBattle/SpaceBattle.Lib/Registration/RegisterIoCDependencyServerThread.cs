@@ -22,12 +22,12 @@ public class RegisterIoCDependencyServerThread : ICommand
             }
             return new ServerThread(new BlockingCommandQueue(_inboxCapacity), new BlockingCommandQueue(), new QueueScheduler(),
                 Ioc.Resolve<IExceptionHandler>(ServerThreadDependencies.ExceptionHandler),
-                Ioc.Resolve<IExceptionFactory>("Factories.Exception"));
+                Ioc.Resolve<IExceptionFactory>(ExceptionDependencies.Factory));
         });
         Register(ServerThreadDependencies.HardStop, args =>
-            new HardStopCommand(ServerThreadOf(args), Ioc.Resolve<IExceptionFactory>("Factories.Exception")));
+            new HardStopCommand(ServerThreadOf(args), Ioc.Resolve<IExceptionFactory>(ExceptionDependencies.Factory)));
         Register(ServerThreadDependencies.SoftStop, args =>
-            new SoftStopCommand(ServerThreadOf(args), Ioc.Resolve<IExceptionFactory>("Factories.Exception")));
+            new SoftStopCommand(ServerThreadOf(args), Ioc.Resolve<IExceptionFactory>(ExceptionDependencies.Factory)));
     }
 
     private static IServerThread ServerThreadOf(object[] args)

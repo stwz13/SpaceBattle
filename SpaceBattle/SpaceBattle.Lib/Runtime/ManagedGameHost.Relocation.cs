@@ -6,12 +6,11 @@ public sealed partial class ManagedGameHost
     {
         lock (gate)
         {
-            replacement.Activate(_buffer!.ToArray());
+            replacement.Activate(TransferControl.Buffered);
             _game = replacement.Game;
             _thread = replacement.Thread;
             _runner = replacement.Runner;
-            _buffer = null;
-            _state = GameHostState.Running;
+            TransferControl.CompleteRelocation();
         }
     }
 }
