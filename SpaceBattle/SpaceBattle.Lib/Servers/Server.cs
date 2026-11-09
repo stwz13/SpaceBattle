@@ -1,9 +1,9 @@
 namespace SpaceBattle.Lib;
 
-public class Server : IServer, IServerContext
+public class Server : IServer, IServerContext, IServerThreadMembership
 {
     private readonly object _gate = new();
-    private readonly List<Member> _members = [];
+    private readonly List<ServerThreadMember> _members = [];
     private readonly IConsistentHashRing<IServerThread> _ring;
     private readonly Func<IServerThread> _createThread;
     private readonly Func<IServerThread, ICommand> _softStop;
@@ -12,6 +12,39 @@ public class Server : IServer, IServerContext
     private readonly string _prefix;
     private IServerState _state = CreatedServerState.Instance;
     private int _next;
+    private bool _removing;
+
+    public IReadOnlyList<(string Id, IServerThread Thread, Task? Completion)> Threads
+    {
+        get { lock (_gate) return _members.Select(member => (member.Id, member.Thread, member.Completion)).ToArray(); }
+    }
+
+    private readonly ServerThreadRemovalService _threadRemoval;
+    public Task RemoveThread(string id, Func<IServerThread, Task> evacuate) => _threadRemoval.Remove(id, evacuate);
+
+    ServerThreadMember IServerThreadMembership.BeginRemoval(string id)
+    {
+        lock (_gate)
+        {
+            _state.EnsureRunning();
+            Require(!_removing, "The server is not available for thread removal.");
+            Require(_members.Count > 1, "The last server thread cannot be removed.");
+            var member = _members.SingleOrDefault(candidate => candidate.Id == id)
+                ?? throw new KeyNotFoundException($"Thread '{id}' was not found.");
+            _removing = true;
+            _ring.Remove(id);
+            return member;
+        }
+    }
+    void IServerThreadMembership.RollbackRemoval(ServerThreadMember member)
+    {
+        lock (_gate) _ring.Add(member.Id, member.Thread);
+    }
+    void IServerThreadMembership.CompleteRemoval(ServerThreadMember member)
+    {
+        lock (_gate) _members.Remove(member);
+    }
+    void IServerThreadMembership.EndRemoval() { lock (_gate) _removing = false; }
 
     public Server(IConsistentHashRing<IServerThread> ring, Func<IServerThread> createThread,
         Func<IServerThread, ICommand> softStop, Func<IServerThread, ICommand> hardStop,
@@ -29,6 +62,7 @@ public class Server : IServer, IServerContext
         _hardStop = hardStop;
         _initialThreads = threadCount;
         _prefix = prefix;
+        _threadRemoval = new ServerThreadRemovalService(this, softStop);
     }
 
     public bool IsRunning
@@ -73,6 +107,7 @@ public class Server : IServer, IServerContext
     {
         lock (_gate)
         {
+            Require(!_removing, "Thread removal is in progress.");
             return _state.AddThread(this);
         }
     }
@@ -85,6 +120,7 @@ public class Server : IServer, IServerContext
     {
         lock (_gate)
         {
+            Require(!_removing, "Thread removal is in progress.");
             return _state.Stop(this, send);
         }
     }
@@ -103,7 +139,7 @@ public class Server : IServer, IServerContext
     {
         foreach (var member in _members)
         {
-            member.Run = member.Thread.Start();
+            member.Completion = member.Thread.Start();
         }
     }
 
@@ -112,7 +148,7 @@ public class Server : IServer, IServerContext
     IServerThread IServerContext.SpawnAndRun()
     {
         var member = Spawn();
-        member.Run = member.Thread.Start();
+        member.Completion = member.Thread.Start();
         return member.Thread;
     }
 
@@ -121,28 +157,27 @@ public class Server : IServer, IServerContext
         foreach (var member in _members)
         {
             _ring.Remove(member.Id);
-            if (member.Run is not null)
+            if (member.Completion is not null)
             {
                 send(member.Thread);
             }
         }
-        return Task.WhenAll(_members.Select(member => member.Run).OfType<Task>().ToArray());
+        return Task.WhenAll(_members.Select(member => member.Completion).OfType<Task>().ToArray());
     }
 
-    private Member Spawn()
+    private ServerThreadMember Spawn()
     {
-        var member = new Member($"{_prefix}-{_next++}", _createThread());
+        var member = new ServerThreadMember($"{_prefix}-{_next++}", _createThread());
         _ring.Add(member.Id, member.Thread);
         _members.Add(member);
         return member;
     }
 
-    private sealed class Member(string id, IServerThread thread)
+    private static void Require(bool condition, string message)
     {
-        public string Id { get; } = id;
-
-        public IServerThread Thread { get; } = thread;
-
-        public Task? Run { get; set; }
+        if (!condition)
+        {
+            throw new InvalidOperationException(message);
+        }
     }
 }
