@@ -30,15 +30,15 @@ public class RegisterIoCDependencyServerThread : ICommand
             if (_queueFactory is not null)
                 return new ServerThread(_queueFactory(), new BlockingCommandQueue(), new QueueScheduler(),
                     Ioc.Resolve<IExceptionHandler>(ServerThreadDependencies.ExceptionHandler),
-                    Ioc.Resolve<IExceptionFactory>("Factories.Exception"));
+                    Ioc.Resolve<IExceptionFactory>(ExceptionDependencies.Factory));
             return new ServerThread(new BlockingCommandQueue(_inboxCapacity), new BlockingCommandQueue(), new QueueScheduler(),
                 Ioc.Resolve<IExceptionHandler>(ServerThreadDependencies.ExceptionHandler),
-                Ioc.Resolve<IExceptionFactory>("Factories.Exception"));
+                Ioc.Resolve<IExceptionFactory>(ExceptionDependencies.Factory));
         });
         Register(ServerThreadDependencies.HardStop, args =>
-            new HardStopCommand(ServerThreadOf(args), Ioc.Resolve<IExceptionFactory>("Factories.Exception")));
+            new HardStopCommand(ServerThreadOf(args), Ioc.Resolve<IExceptionFactory>(ExceptionDependencies.Factory)));
         Register(ServerThreadDependencies.SoftStop, args =>
-            new SoftStopCommand(ServerThreadOf(args), Ioc.Resolve<IExceptionFactory>("Factories.Exception")));
+            new SoftStopCommand(ServerThreadOf(args), Ioc.Resolve<IExceptionFactory>(ExceptionDependencies.Factory)));
     }
 
     private static IServerThread ServerThreadOf(object[] args)

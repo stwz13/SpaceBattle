@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using App;
-
 namespace SpaceBattle.Lib;
 
 public sealed class RegisterIoCDependencyErrorPolicy(
@@ -12,20 +11,19 @@ public sealed class RegisterIoCDependencyErrorPolicy(
             throw new ArgumentException("Error rules require exception types and nonnegative retry limits.");
         var policy = new ExceptionErrorPolicy(rules.ToDictionary());
         var output = log ?? new MemoryLog(new ConcurrentQueue<(string, Exception, ErrorAction, int)>());
-        var runtime = Ioc.Resolve<IGameRuntime>("Server.Games");
-        var ring = Ioc.Resolve<IConsistentHashRing<IServerThread>>(RoutingDependencies.Ring);
-        RegisterIoCDependencyManagedGames.Register("Errors.Policy", _ => policy);
-        RegisterIoCDependencyManagedGames.Register("Errors.Log", _ => output);
-        Ioc.Resolve<IMessageInterpreter>("Messages.Decorate", (Func<IMessageInterpreter, IMessageInterpreter>)(inner =>
-            new PolicyMessageInterpreter(inner, (message, action) => new ErrorPolicyCommand(message.GameId, action, policy, output,
-                () => ((IManagedGameHost)runtime.Find(message.GameId)).StopForError(),
-                () =>
-                {
-                    var owner = ((IManagedGameHost)runtime.Find(message.GameId)).Thread;
-                    runtime.Games.Where(game => ReferenceEquals(game.Thread, owner)).ToList().ForEach(game => game.StopForError());
-                    ((Server)runtime.Server).Threads.Where(member => ReferenceEquals(member.Thread, owner)).ToList()
-                        .ForEach(member => ring.Remove(member.Id));
-                    owner.HardStop();
-                }))));
+        var runtime = Ioc.Resolve<IGameRuntime>(RuntimeDependencies.Games);
+        var games = Ioc.Resolve<IManagedGameRegistry>(RuntimeServiceDependencies.Registry);
+        var actions = new Dictionary<ErrorAction, IErrorAction>
+        {
+            [ErrorAction.Retry] = new RetryErrorAction(),
+            [ErrorAction.Skip] = new SkipErrorAction(),
+            [ErrorAction.StopGame] = new StopGameErrorAction(games),
+            [ErrorAction.StopThread] = new StopThreadErrorAction(games, runtime.Server)
+        };
+        IoCRegistrar.Register(ErrorDependencies.Policy, _ => policy);
+        IoCRegistrar.Register(ErrorDependencies.Log, _ => output);
+        Ioc.Resolve<IMessageInterpreter>(MessagePipelineDependencies.Decorate,
+            (Func<IMessageInterpreter, IMessageInterpreter>)(inner => new PolicyMessageInterpreter(inner,
+                (message, action) => new ErrorPolicyCommand(action, new ErrorRecovery(message.GameId, policy, output, actions)))));
     }
 }

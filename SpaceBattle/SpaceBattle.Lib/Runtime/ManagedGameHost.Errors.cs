@@ -6,7 +6,7 @@ public sealed partial class ManagedGameHost
     {
         lock (gate)
         {
-            _state = GameHostState.Stopped;
+            lifecycle.Stop();
             _game.Paused = true;
         }
     }
