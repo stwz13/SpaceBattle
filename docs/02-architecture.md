@@ -1,134 +1,105 @@
-# 02. Архитектура SpaceBattle
+# 02. Архитектура
 
-Срез 2026-11-09 по 37 снимкам: 36 актуальных веток и историческая refuel, удалённая на GitHub в ходе аудита. Разделы 1–8 описывают общую основу и игровые ветки; разделы 9–12 — современный серверный стек и независимые расширения. Состав конкретной ветки указан в [01](01-branches.md). Нельзя считать весь описанный код одной опубликованной сборкой.
-Язык/платформа: C# 14, **.NET 10** (`net10.0`), `Nullable=enable`, `ImplicitUsings=enable`. Тесты: xUnit 2.9.3 + Moq 4.20.72 + coverlet.
+Язык и платформа: C# 14, **.NET 10** (`net10.0`), `Nullable=enable`, `ImplicitUsings=enable`.
+Пакеты: Roslyn (`Microsoft.CodeAnalysis.CSharp` 4.14.0) для генерации адаптеров, `Microsoft.IdentityModel.JsonWebTokens` 8.23.0 для JWT, ASP.NET Core в `SpaceBattle.Http`. Тесты: xUnit 2.9.3, Moq 4.20.72, coverlet.
 
-## 1. Слои и сборки
+Описание относится к серверному стеку (`feature/server-host` и выше) и к стволу игровых команд. Где что лежит — [01-branches.md](01-branches.md).
+
+## 1. Сборки и проекты
 
 ```
 SpaceBattle.slnx
-├── Assemblies/core.dll      — App.Ioc, App.ICommand, UpdateIocResolveDependencyStrategyCommand   (даны, исходников нет)
-├── Assemblies/scopes.dll    — App.Scopes.InitCommand, DependencyResolver, IDependencyResolver   (даны, исходников нет)
-├── SpaceBattle.Lib          — вся логика (+ Config/*.config копируются в вывод)
-│     NuGet: Microsoft.CodeAnalysis.CSharp 4.14.0  (Roslyn — компиляция сгенерированных адаптеров)
-├── SpaceBattle.Http         — ASP.NET Core, Program/ApiEndpoints; начиная с feature/http-api
-└── SpaceBattle.Tests        — xUnit; ссылается на Lib и на обе DLL; Roslyn подтягивается транзитивно через Lib (нужен архитектурным тестам)
+├── Assemblies/core.dll      App.Ioc, App.ICommand, UpdateIocResolveDependencyStrategyCommand (готовая, исходников нет)
+├── Assemblies/scopes.dll    App.Scopes.InitCommand, DependencyResolver (готовая, исходников нет)
+├── SpaceBattle.Lib          вся логика
+├── SpaceBattle.Http         ASP.NET Core: точка входа и два HTTP-эндпоинта
+└── SpaceBattle.Tests        xUnit; ссылается на Lib, Http и обе DLL
 ```
 
-`core.dll`/`scopes.dll` — учебные библиотеки преподавателя; их **нельзя менять**, API:
+`core.dll` и `scopes.dll` менять нельзя.
 
-```csharp
-// core.dll
-namespace App {
-  public interface ICommand { void Execute(); }                         // ≠ SpaceBattle.Lib.ICommand!
-  public static class Ioc { public static T Resolve<T>(string dependency, params object[] args); }
-}
-// scopes.dll
-new App.Scopes.InitCommand().Execute();    // инициализирует корневой скоуп и ключи IoC.*
-```
+### Два разных `ICommand`
 
-### ⚠ Две разные `ICommand`
-В проекте **два** интерфейса `ICommand` с одним методом `Execute()`:
-- `App.ICommand` — из `core.dll`; им пользуется только сам IoC (`IoC.Register`, `IoC.Scope.Current.Set` возвращают его).
-- `SpaceBattle.Lib.ICommand` — доменный интерфейс; **все команды игры** реализуют его.
+- `App.ICommand` — из `core.dll`; только IoC возвращает его (`IoC.Register`, `IoC.Scope.Current.Set`). Пишется **всегда с префиксом**.
+- `SpaceBattle.Lib.ICommand` — доменный интерфейс; все команды игры реализуют его. В коде Lib без префикса `ICommand` означает именно его. В тестах (namespace `SpaceBattle.Tests`) пишут `Lib.ICommand`.
 
-В Lib-коде `ICommand` без префикса = `SpaceBattle.Lib.ICommand` (побеждает тип из своего namespace, даже при `using App;`).
-`App.ICommand` пишется **всегда с префиксом**: `Ioc.Resolve<App.ICommand>("IoC.Register", ...)`.
-В тестах (namespace `SpaceBattle.Tests`) доменную пишут `Lib.ICommand`. Не перепутайте — это самая частая ошибка.
+Это самая частая ошибка в проекте.
 
 ## 2. IoC и скоупы
 
-Единая точка получения зависимостей — `Ioc.Resolve<T>(key, args...)`. Стратегия по ключу — `Func<object[], object>`.
+Всё получают через `Ioc.Resolve<T>(ключ, аргументы...)`. Стратегия по ключу — `Func<object[], object>`: она сама проверяет число и тип аргументов и бросает `ArgumentException`.
 
-Ключи самого контейнера (строки найдены в `scopes.dll`; семантика выведена из использования, исходников нет):
+Ключи самого контейнера (из `scopes.dll`; семантика выведена из использования):
 
 | Ключ | Аргументы | Результат |
 |---|---|---|
-| `IoC.Register` | `key`, `Func<object[],object>` | `App.ICommand`; `.Execute()` регистрирует стратегию **в текущем скоупе** |
-| `IoC.Scope.Create` | – | `object` — новый (дочерний) скоуп |
-| `IoC.Scope.Create.Empty` | – | `object` — скоуп без родителя (по названию) |
-| `IoC.Scope.Current` | – | `object` — текущий скоуп |
-| `IoC.Scope.Current.Set` | `scope` | `App.ICommand` — сделать скоуп текущим |
+| `IoC.Register` | `key`, `Func<object[],object>` | `App.ICommand`; `.Execute()` регистрирует стратегию в **текущем** скоупе |
+| `IoC.Scope.Create` | – | новый дочерний скоуп |
+| `IoC.Scope.Create.Empty` | – | скоуп без родителя |
+| `IoC.Scope.Current` | – | текущий скоуп |
+| `IoC.Scope.Current.Set` | `scope` | `App.ICommand`, делает скоуп текущим |
 | `IoC.Scope.Current.Clear` | – | `App.ICommand` |
-| `IoC.Scope.Parent` | – | родитель; у корневого бросает "The root scope has no a parent scope." |
+| `IoC.Scope.Parent` | – | родитель; у корневого бросает исключение |
 
-Неизвестный ключ → исключение `Exception("Dependency {dependency} is not found.")` (тесты ловят `Assert.Throws<Exception>`).
+Неизвестный ключ → `Exception("Dependency … is not found.")`.
 
-**Типовая инициализация теста** (повторяется почти в каждом тест-классе):
+**Текущий скоуп хранится отдельно для каждого потока** (`ThreadLocal`). Поэтому после `await` код, оказавшийся на другом потоке, видит чужой скоуп. Выход — `ScopeExecution.InScope(scope, () => ...)` и `GameScope`: `GameScope.Enter()` запоминает текущий скоуп, ставит свой и возвращает `IDisposable`, который при `Dispose` всё возвращает.
 
-```csharp
-new InitCommand().Execute();                                                        // scopes.dll
-Ioc.Resolve<App.ICommand>("IoC.Scope.Current.Set", Ioc.Resolve<object>("IoC.Scope.Create")).Execute();  // чистый скоуп на тест
-new RegisterIoCDependencyCodeGeneration().Execute();
-new RegisterIoCDependencyGeneratedStrategies(typeof(MoveCommand).Assembly, deps).Execute();
-new RegisterIoCDependencyMacroCommand().Execute();
-new RegisterIoCDependencyActionComposition().Execute();
-new RegisterIoCDependencyActionConfigurations(Path.Combine(AppContext.BaseDirectory, "Config")).Execute();
-```
-
-`GameScope` (Lib/Scopes) — обёртка над объектом-скоупом: `Enter()` запоминает текущий скоуп, ставит свой и возвращает `IDisposable`,
-который при `Dispose` восстанавливает прежний. Так исполняется игра (`Game.Execute`) и так `Server` создаёт потоки/стоп-команды в
-скоупе, где регистрировался сервер.
+Регистрации **скоупозависимы**: стратегия, зарегистрированная в скоупе игры, не видна снаружи. Регистрацию в корне делает `ServerComposition`, а у каждой игры свой дочерний скоуп.
 
 ## 3. Модель данных
 
-- `IGameItem` — игровой объект = словарь свойств: `GetProperty(name)`, `SetProperty(name, value)`. `GameItem` — реализация поверх `IDictionary<string,object>`.
-  Отсутствующее свойство → `KeyNotFoundException`. Типы значений — по соглашению: `Position`/`Velocity` = `Vector`, `Direction`/`AngularVelocity` = `Angle`, `Fuel`/`Speed`/`Ammo`/`Health`/`Damage` = `int`, `Destroyed` = `bool`, `Id` = `string` (Guid "N").
-- `Vector` (`int[] Coordinates`, `Dim`, оператор `+`, value-equality). Конструктор копирует входной массив, но публичный `int[] Coordinates` допускает изменение элементов: полной иммутабельности нет. `new Vector(params int[])`.
-- `Angle` — дискретный угол в **восьмых долях круга**: `Denominator = 8`, `Numerator` нормализуется в `[0,8)`, `Radians = 2π·n/8`, `+`, value-equality. `new Angle(n)`.
-- `IGameItemStorage` (`Add/Get/Remove/GetSnapshot`, ключ — строковый id) — хранилище объектов боя.
-- `IBattleContext` = `Id` + `Storage`. Создаётся `IBattleContextFactory.Create(id)` (`new BattleContext(id, new GameItemStorage())`).
-  В скоуп регистрируется `RegisterIoCDependencyBattleContext(context)` → ключи `Contexts.Battle` и `Storages.GameItem`.
-- `ICommandContext` — «роль → объект» (`GetItem(role)`); `CommandContext` копирует входные пары (роли регистрозависимы, дубли запрещены).
-  Нужен для команд над **двумя** объектами (Target/Source) — столкновения, урон, дозаправка (tanker).
+- `IGameItem` — словарь свойств: `GetProperty(name)`, `SetProperty(name, value)`. Отсутствующее свойство → `KeyNotFoundException`. Типы значений по соглашению: `Position`/`Velocity` — `Vector`, `Direction`/`AngularVelocity` — `Angle`, `Fuel`/`Speed`/`Ammo`/`Health`/`Damage` — `int`, `Destroyed` — `bool`.
+- `Vector` — неизменяемый целочисленный вектор (`Coordinates`, `Dim`, оператор `+`, сравнение по значению).
+- `Angle` — угол в **восьмых долях круга**: `Numerator` нормализуется в `[0, 8)`, `new Angle(9) == new Angle(1)`.
+- `IGameItemStorage` (`Add`, `Get`, `Remove`, `GetSnapshot`) — хранилище предметов игры, ключ — строковый `Id`. Дубль ключа → `ArgumentException`.
+- `IBattleContext` = `Id` + `Storage`. Создаётся `IBattleContextFactory.Create(id)`.
+- `ICommandContext` — «роль → предмет» для команд над несколькими предметами (Target, Source).
 
-## 4. Паттерн «команда над адаптером» и кодогенерация
+### Предметы с `Id` и `Kind`
 
-Идея учебного курса: команды работают не с `IGameItem` напрямую, а с узким интерфейсом-«представлением»
-(`IMoving`, `IRotating`, `IShooting`, …). Адаптер от `IGameItem` к такому интерфейсу **генерируется во время выполнения Roslyn-ом**.
+`ItemCreator.Create(kind, id, properties)`:
+1. запрещает `Id` и `Kind` в `properties` (иначе `ArgumentException`);
+2. добавляет их сам;
+3. создаёт предмет через `IGameItemFactory`;
+4. кладёт в хранилище **текущей игры** под ключом `id`.
 
-Конвейер (`RegisterIoCDependencyGeneratedStrategies` / `...WithAdapters` → `GeneratedStrategyRegistration`):
+Идентификатор уникален в пределах одной игры. `Kind` нужен для снимка: он указывает, какие свойства предмета сохранять (схема вида).
 
-1. `CommandFinder.Find(assembly)` — ищет в сборке публичные неабстрактные классы, реализующие `Lib.ICommand`, с именем на `Command`
-   и **ровно одним** параметром конструктора, который является «адаптируемым интерфейсом» → пары `(Command, Interface)`.
-2. `InterfaceInspector.IsAdaptable(type)` — интерфейс публичный, **не generic**, **только свойства** (никаких методов/событий/индексаторов).
-3. `AdapterSourceBuilder` генерирует класс `SpaceBattle.Generated.<Mangled>Adapter : IFoo`, свойства которого ходят в IoC:
-   `get → Ioc.Resolve<T>("Properties.<view>.<declaringType>.<Name>", _item)`,
-   `set → Ioc.Resolve<Lib.ICommand>("Properties....<Name>.Set", _item, value).Execute()`.
-4. `StrategySourceBuilder` генерирует статический класс `SpaceBattle.Generated.Strategies` с методами-стратегиями:
-   адаптер `new XAdapter((IGameItem)args[0])` и команду `new SomeCommand(Ioc.Resolve<IFoo>("Adapters.<..>Adapter", args))`.
-5. `RoslynSourceCompiler` компилирует исходник в память (кэш по тексту исходника), `Assembly.Load`. В trunk кэш статический; в свежих shooting/server-snapshot и серверных потомках — на уровне экземпляра компилятора, с отдельными тестами изоляции.
-6. Регистрация в IoC (в **текущем** скоупе):
-   - `Adapters.<Mangled(iface)>Adapter` → адаптер для `args[0]` (IGameItem)
-   - `Commands.<Mangled(commandType)>` → команда, обёрнутая вокруг адаптера для `args[0]`
-   - `Properties.<view>.<decl>.<Prop>` → геттер (по умолчанию `item.GetProperty(Prop)`; либо перенаправлен через `Dependency`, см. ниже)
-   - `Properties.<view>.<decl>.<Prop>.Set` → `SetPropertyCommand(item, Prop, value)`
+Известное ограничение: `GameItemStorage.Add` не проверяет, что ключ совпадает со свойством `Id` предмета.
 
-`GeneratedNames.Mangle(type)` = `FullName.Replace('.', '_').Replace('+', '_')`. Примеры ключей:
-`Commands.SpaceBattle_Lib_MoveCommand`, `Adapters.SpaceBattle_Lib_IMovingAdapter`,
-`Properties.SpaceBattle_Lib_IMoving.SpaceBattle_Lib_IMoving.Position`.
+## 4. Команды над адаптерами и кодогенерация
 
-### `Dependency(Type Interface, string Property, string Strategy)` — вычисляемые/внедряемые свойства
-`record Dependency` говорит генератору: «геттер свойства `Property` интерфейса `Interface` не читать из `IGameItem`,
-а получить через `Ioc.Resolve<object>(Strategy, item)`». Применения:
-- `MovementDependencies.ComputedVelocity`: `IMoving.Velocity` ← `Properties.ComputedVelocity` (скорость вычисляется из `Speed` и `Direction`).
-- `ShootingDependencies.All`: `IShooting.ProjectileFactory` ← `Factories.Projectile`, `IShooting.Storage` ← `Storages.GameItem`, `IShooting.ExceptionFactory` ← `Factories.Exception`.
-При нескольких кандидатах выбирается наиболее специфичный интерфейс; при неоднозначности — `InvalidOperationException("Ambiguous dependency ...")`.
+Команды работают не с `IGameItem`, а с узким интерфейсом-представлением (`IMoving`, `IRotating`, `IShooting` …). Класс-адаптер от `IGameItem` к такому интерфейсу **генерируется Roslyn-ом во время выполнения**.
 
-### Два варианта регистрации
-| Класс | Для чего |
+Конвейер (`RegisterIoCDependencyGeneratedStrategies`):
+
+1. `CommandFinder.Find(assembly)` ищет публичные неабстрактные классы, реализующие `Lib.ICommand`, с именем на `Command` и **ровно одним** параметром конструктора — адаптируемым интерфейсом.
+2. `InterfaceInspector.IsAdaptable`: интерфейс публичный, не generic, **только свойства** (ни методов, ни событий, ни индексаторов).
+3. `AdapterSourceBuilder` генерирует класс `SpaceBattle.Generated.<Имя>Adapter`, свойства которого ходят в IoC: `get` → `Ioc.Resolve<T>("Properties.<вид>.<объявляющий тип>.<Имя>", item)`, `set` → `Ioc.Resolve<ICommand>("Properties….<Имя>.Set", item, value).Execute()`.
+4. `StrategySourceBuilder` генерирует статический класс стратегий (адаптер + команда вокруг него).
+5. `RoslynSourceCompiler` компилирует в память и кэширует по тексту исходника на весь процесс.
+6. Регистрация в текущем скоупе: `Adapters.<M(интерфейс)>Adapter`, `Commands.<M(команда)>`, `Properties.…` (геттер) и `Properties.….Set` (команда `SetPropertyCommand`).
+
+`M(тип)` = `FullName` с заменой `.` и `+` на `_`. Пример: `Commands.SpaceBattle_Lib_MoveCommand`.
+
+### `Dependency` — свойства, которых нет в предмете
+
+`Dependency(Type Interface, string Property, string Strategy)` говорит генератору: «геттер этого свойства не читай из `IGameItem`, а возьми из IoC по ключу `Strategy`». Примеры: `IMoving.Velocity` ← `Properties.ComputedVelocity` (скорость вычисляется из `Speed` и `Direction`), `IShooting.ProjectileFactory` ← `Factories.Projectile`.
+
+### Варианты регистрации
+
+| Класс | Назначение |
 |---|---|
-| `RegisterIoCDependencyGeneratedStrategies(Assembly, IEnumerable<Dependency>)` | автопоиск команд и их интерфейсов в сборке (публичный API; в актуальном trunk делегирует общий GeneratedStrategyRegistration) |
-| `RegisterIoCDependencyGeneratedStrategiesWithAdapters(IEnumerable<Assembly>, IEnumerable<Type> extraInterfaces, IEnumerable<Dependency>)` | то же + явные интерфейсы, для которых нужны адаптеры без одноимённой команды (Target/Source у tanker-refuel и damage) |
-| `RegisterIoCDependencyGeneratedAdapters(interfaces, deps)` | только адаптеры, без команд |
+| `RegisterIoCDependencyGeneratedStrategies(Assembly, deps)` | находит команды и интерфейсы сам |
+| `RegisterIoCDependencyGeneratedStrategiesWithAdapters(assemblies, extraInterfaces, deps)` | плюс адаптеры для интерфейсов без одноимённой команды (команды над двумя предметами) |
+| `RegisterIoCDependencyGeneratedAdapters(interfaces, deps)` | только адаптеры |
 
-Требует предварительно `RegisterIoCDependencyCodeGeneration` (регистрирует `CodeGeneration.*`).
+Требует предварительно `RegisterIoCDependencyCodeGeneration`.
 
-## 5. Действия (Actions): макрокоманды из конфигурации
+## 5. Действия (Actions)
 
-«Действие» = именованная последовательность команд, заданная **текстовым файлом** `Config/<Action>.config`.
-
-Формат `.config`: токены (имена IoC-ключей) разделяются переводом строки или запятой; всё после `#` в строке — комментарий; пустые игнорируются.
+Действие — именованная последовательность команд из файла `Config/<Action>.config`. Формат: токены (имена IoC-ключей) через перевод строки или запятую, всё после `#` — комментарий.
 
 ```
 # Movement.config
@@ -137,131 +108,176 @@ Commands.SpaceBattle_Lib_MoveCommand
 Commands.SpaceBattle_Lib_BurnFuelCommand
 ```
 
-`RegisterIoCDependencyActionConfigurations(directory)` для каждого `*.config` (в порядке имён) регистрирует
-`<Action>.Config` → `string[]` и `Specs.<Action>` → тот же массив.
+- `RegisterIoCDependencyActionConfigurations(dir)` регистрирует для каждого `*.config` ключи `<Action>.Config` и `Specs.<Action>`.
+- `Commands.Action(action, item)` резолвит каждое имя с `item` и оборачивает всё в `Commands.Macro` (`MacroCommand`).
+- `Commands.ContextAction(action, ICommandContext)` — то же, но шаги резолвятся с контекстом (для команд над двумя предметами; шаги вида `Context.Xxx`).
+- Макрокоманда выполняет шаги по порядку; исключение на любом шаге **прерывает** остаток (поэтому «нет топлива» не даёт двигаться — проверка идёт первой). Отката уже выполненных шагов нет.
+- Создание действия его не выполняет; повторный `Execute()` читает актуальные свойства.
 
-Исполнение:
-- **`Commands.Action`** (`RegisterIoCDependencyActionComposition`): `Resolve<Lib.ICommand>("Commands.Action", "Movement", item)` → каждое имя из `Movement.Config` резолвится с `item`, всё оборачивается в `Commands.Macro` (`MacroCommand`).
-  Макрокоманда выполняет шаги по порядку; исключение на любом шаге **прерывает** остаток (так «нет топлива» не даёт двигаться — Check идёт первым).
-- **`Commands.ContextAction`** (`RegisterIoCDependencyContextActionComposition`): `Resolve<Lib.ICommand>("Commands.ContextAction", "Hit", ICommandContext)` — то же, но шаги резолвятся с `ICommandContext` (для команд из двух объектов).
-  Шаг-ключи вида `Context.Xxx` регистрируются отдельными `RegisterIoCDependency*ContextCommand` (см. [04-ioc-keys.md](04-ioc-keys.md)).
-- `Commands.Macro` (`RegisterIoCDependencyMacroCommand`): `Resolve<Lib.ICommand>("Commands.Macro", cmd1, cmd2, ...)`.
+## 6. Игра
 
-Создание действия **не выполняет** его; команда пере-используется: повторный `Execute()` читает актуальные свойства объекта.
+Игра (`Game`) — очередь команд (`GameQueue`), скоуп (`GameScope`) и квант времени (`TimeQuantum`).
 
-## 6. Игровой цикл и сервер (многопоточность)
+`Game.Execute()`: войти в скоуп игры → `quantum.Start()` → выполнять команды из очереди, пока они есть и квант не истёк (одна команда за заход выполняется всегда, чтобы игра не зависла).
 
-```
-JSON-строка ──► IMessageReceiver.Receive ──► JsonMessageParser ──► IMessage{GameId,Command,Args}
-                         │
-                         ▼ GameRegistry.Find(gameId)
-                     IGameHost.Send(message)
-                         │ new PostToGameCommand(runner, new InterpretMessageCommand(interpreter, message))
-                         ▼
-                 IServerThread.Add(...)  ─── (очередь входящих BlockingCommandQueue)
-                         │  поток ServerThread: Execute() → _behaviour → Process
-                         ▼
-                 PostToGameCommand.Execute → IGameRunner.Post(cmd) → IGame.Post → GameQueue.Enqueue
-                                             + _thread.Schedule(runner)   (планировщик QueueScheduler)
-                         ▼
-                 GameRunner.Execute → Game.Execute:
-                     using scope.Enter()  (игровой IoC-скоуп);  quantum.Start();
-                     выполнять команды из GameQueue, пока есть команды и квант не истёк (минимум одна за тик)
-                         ▼
-                 IoCMessageInterpreter: Ioc.Resolve<ICommand>("Messages.Command.<message.Command>", message).Execute()
-```
+- `GameQueue` не потокобезопасна: касаться её можно только из потока игры.
+- `Games.Create(id)` создаёт игру со своим `BattleContext`, своим скоупом и своим хранилищем предметов.
+- `Game.Execute` исключения не перехватывает. Их ловит серверный поток (см. §8), а команды-сообщения дополнительно оборачивает политика ошибок (см. §13).
 
-- **ServerThread** (`Threads/ServerThread.cs`): сам является `ICommand`; `Start()` → `Task.Factory.StartNew(Run, LongRunning)` (повторный старт → исключение).
-  Внутренний цикл — вторая очередь `_loop`: поток кладёт себя в `_loop`, `Execute()` выполняет `_behaviour` и, если `_running`, снова ставит себя в `_loop`.
-  `Process`: если в планировщике есть команды — взять одну новую из inbox (без блокировки) и одну запланированную; иначе блокирующий `Take()` из inbox.
-  Исключения команд ловит `Handle` → `IExceptionHandler.Handle(command, exception)`.
-- **Stop-команды**: `HardStopCommand`/`SoftStopCommand` выполняются **только самим потоком** (иначе `InvalidOperation`).
-  `HardStop` — закрыть inbox и выйти немедленно; `SoftStop` — закрыть inbox, перейти в `Drain` (дорабатывать оставшееся, потом выйти).
-  `Interrupt(cmd)` = добавить в **начало** inbox (используется для hard stop сервера).
-- **Routing**: `ConsistentHashRing<TNode>` — кольцо с виртуальными узлами (`replicas`), по умолчанию `FnvHashFunction` (FNV-проход по двум байтам каждого char с финальным перемешиванием); `Sha256HashFunction` остаётся внедряемой альтернативой; иммутабельные снимки + `lock` на запись. Ключ маршрутизации = `gameId`, узел = `IServerThread`.
-- **Server** (`Servers/Server.cs`): объекты состояний `CreatedServerState → RunningServerState → ClosedServerState`; публично доступны IsRunning и ThreadCount, прежнего enum ServerState/свойства State в актуальных ветках нет; `Start()` создаёт N потоков (`Thread-0..`), добавляет в кольцо и стартует;
-  `AddThread()`; `SoftStop()`/`HardStop()` убирают потоки из кольца, шлют стоп-команды и возвращают `Task`, завершающийся когда все потоки закончили.
-- **Games.Start(gameId)** (в `RegisterIoCDependencyMessages`): находит поток по кольцу, создаёт `IGame` (`Games.Create` — свой `BattleContext` и свой скоуп), `IGameRunner`, `GameHost`, и **регистрирует хост в `GameRegistry`**.
-- `TimeQuantum(duration, TimeProvider)` — квант считается по `TimeProvider` (в тестах подменяется `ManualTimeProvider`).
+`GameRunner(game, thread)`: `Post(cmd)` кладёт команду в игру и один раз ставит себя в расписание потока; `Execute()` прогоняет игру, а в `finally` ставит себя заново, если в игре остались команды. Так несколько игр на одном потоке получают кванты по очереди.
 
-В базовых ветках до managed/server-host приложение само регистрирует `ServerThreads.ExceptionHandler`. В свежем server-host это делает composition root: `DeferredExceptionHandler` связывается с `LoggingExceptionHandler` и error recovery. Точка входа существует в `SpaceBattle.Http/Program.cs`; в trunk проекта Http ещё нет.
+## 7. Серверный поток
 
-## 7. Столкновения и урон
+`ServerThread` сам является командой. Запуск — `Task.Factory.StartNew(Run, LongRunning)`, повторный старт → исключение. У потока:
 
-- Таблица столкновений — файл `*.collisions`: строки `dx dy dvx dvy` (4 целых; `#`-комментарии и пустые строки игнорируются), где `d = B.pos − A.pos`, `dv = B.vel − A.vel` (`CollisionOffset.Between(first, second)` берёт `Position` и `Velocity` обоих объектов).
-- `CollisionTree` — дерево решений (префиксное по 4 числам): `Contains(path)`; строится рекурсивно из списка векторов (без циклов).
-- `RegisterIoCDependencyCollisions(directory)`: для каждого `*.collisions` (рекурсивно) регистрирует ленивое дерево по ключу
-  `Collisions.<относительный путь без расширения, разделители → '.'>` (напр. `Collisions.Ship-Ship.0-0`) и фабрику `Commands.Collision`.
-- `CollisionCommand(tree, Func<Vector> offset, ICommand onCollision)` — если смещение в дереве, выполняет `onCollision`. Смещение вычисляется **в момент Execute**.
-- `RegisterIoCDependencyCollisionContextCommand` — контекстная команда: двое по ролям + дерево + имя последствия (`ContextAction`).
-- Урон: `ApplyDamageCommand(IDamageTarget, IDamageSource)`: `Health = max(0, Health − Damage)`; `DestroyIfDeadCommand(IDestructible)`: `Health ≤ 0 → Destroyed = true`.
-  Цепочка «Hit» (`Config/Hit.config`): `Context.ApplyDamage` → `Context.DestroyIfDead`.
-- Генератор таблиц: `tools/collisions/generate_collisions.py` (Python 3; PNG требует Pillow) — Minkowski-разность масок + supercover-проход, `--self-test` для проверки.
+- **входящий ящик** (`ICommandQueue`) — в серверных ветках приоритетная очередь `PriorityCommandQueue` (по умолчанию включена, `ServerOptions.PriorityQueues`), внутри одного приоритета порядок FIFO;
+- **планировщик** (`QueueScheduler`) — команды игр, которые надо выполнить;
+- обработчик исключений `IExceptionHandler`: `Handle` ловит исключение любой команды и передаёт обработчику (в сервере это `LoggingExceptionHandler`).
 
-## 8. Стрельба
+Остановка:
+- `SoftStop` — закрыть ящик и **дорабатывать** накопленное;
+- `HardStop` — команда обгоняет очередь (`AddFirst`), остальное отбрасывается.
 
-`ShootCommand(IShooting)`: если `Ammo ≤ 0` → `InvalidOperationException("Not enough ammunition to shoot.")`;
-иначе `ProjectileFactory.Create(Position, Direction, ProjectileSpeed, ProjectileDamage)` → снаряд (`IGameItem` со свойствами `Id, Position, Direction, Speed, Damage, Destroyed, Velocity`),
-кладётся в `Storage` по `Id`, `Ammo--`. Скорость снаряда считается тем же `Properties.ComputedVelocity`.
-Фабрика требует двумерную позицию (`Dim == 2`), неотрицательные скорость и урон.
-Действие `Shooting` (`Config/Shooting.config` = `Commands.SpaceBattle_Lib_ShootCommand`).
+Обе команды выполняются только самим потоком, иначе `InvalidOperationException`.
 
+## 8. Маршрутизация
 
-## 9. Современный managed runtime
+`ConsistentHashRing<TNode>` — кольцо с виртуальными узлами. Ключ — `gameId`, узел — `IServerThread`. Позиции узла считаются как `hash("{id}#{replica}")`. Хэш по умолчанию — `FnvHashFunction` (есть и `Sha256HashFunction`). Пустое кольцо → `InvalidOperationException("The ring has no nodes.")`.
 
-В `test/server-e2e` и его серверных предках поверх базового сервера построен управляемый runtime. После рефакторинга 2026-11-09 `GameRuntime` — фасад, а логика разнесена по сервисам:
+### Ограничение нагрузки (`feature/bounded-load-routing`)
 
-- `ManagedGame` объединяет `Game`, скоуп и состояние исполнения; `GameExecutionState.Paused` останавливает выборку команд после команды-барьера. Снимок получается из потока-владельца игры.
-- `ManagedGameHost` хранит игру, runner и поток. `GameHostLifecycle` управляет состояниями `Running`, `Moving`, `Moved`, `Stopped`; `GameHostTransferService` — буфером и проксированием.
-- `ManagedGameRegistry` хранит hosts; `GameLifecycle` стартует игры; `GameSnapshotService` координирует снимки/restore; `GameTransferService`, `GameRebalanceService`, `ThreadRemovalService` решают свои задачи через узкие интерфейсы.
-- `SemaphoreSlim` жизненного цикла сериализует топологические операции. Внешний перенос использует неблокирующий захват: пересекающиеся операции отклоняются перегрузкой, а не ждут друг друга с взаимной блокировкой.
-- `RegisterIoCDependencyManagedGames` создаёт **дочерний текущий скоуп** и переопределяет в нём `Games.Create/Start/Registry`, receiver и interpreter. Он не просто добавляет независимые ключи. При композиции надо сохранять/восстанавливать скоуп.
+Обычное кольцо может посадить несколько тяжёлых игр на один поток. `BoundedLoadRouter` оставляет владельца с кольца, пока на нём игр меньше `ceil((игр + 1) / потоков × (1 + tolerance))`; иначе пробует ключ `key/1`, `key/2`, … (до `LoadProbes` попыток), а если все заняты — берёт наименее загруженный. Включается опцией `ServerOptions.LoadTolerance`. Нагрузку считает `PlacementLoadMeter` по играм, живущим на каждом потоке, включая переносимые (`PlannedMoves`). Тот же маршрут используют ребаланс и удаление потока.
 
-Снимок игры — JSON с `gameId`, `items`, `commands`. Объекты сериализуются по `Kind` и зарегистрированной схеме свойств; значения — через именованные codecs. Очередь поддерживает только команды с зарегистрированным `ICommandSerializer`. Это не универсальная сериализация любого ICommand/Task/делегата.
+## 9. Сервер и его состояния
 
-Снимок сервера: пауза работающих игр → снимки → сохранение набора → soft stop → состояния Stopped. При ошибке сохранения игры возобновляются, если сервер ещё работает. Restore создаёт managed games и ждёт выполнения барьеров восстановления. `FileSnapshotStore` реализует batch-store и сохраняет весь набор через временный файл/замену; memory replacement-store также заменяет набор, удаляя устаревшие записи.
+`Server` владеет потоками и кольцом. Его поведение вынесено в **состояния** (паттерн «Состояние»), перечисления `ServerState` нет:
 
-Внешний перенос: source становится Moving и буферизует новые сообщения; target восстанавливает paused game и возвращает `IGameArrival`; commit передаёт буфер и активирует игру; прежний source становится Moved и проксирует сообщения. До успешного commit ошибка вызывает abort target и resume source. Это протокол `IRemoteServer` в памяти/через внедряемую реализацию, а не готовый сетевой транспорт между произвольными HTTP-серверами.
+| Состояние | Класс | Поведение |
+|---|---|---|
+| создан | `CreatedServerState` | `Start` (создаёт начальные потоки и запускает), `AddThread` (поток создаётся, но не запускается до `Start`), остановка |
+| работает | `RunningServerState` | `AddThread` (поток сразу запускается), остановка; повторный `Start` → `InvalidOperationException` |
+| закрыт | `ClosedServerState` | всё запрещено: `Start` → «already been started», `AddThread` → «The server is stopping.», остановка → «already been stopped» |
 
-Добавление потока меняет ring и переносит игры с изменившимся маршрутом. Удаление исключает поток из размещения, эвакуирует игры и завершает поток; удаление последнего потока отклоняется. В новых серверных ветках жизненный цикл `Server` реализован объектами состояний `Servers/States/*`, а ответственность удаления выделена отдельно.
+Создан и работает наследуют `OpenServerState`: остановка у них общая — перейти в `Closed` и закрыть потоки (`Shutdown`).
 
-## 10. Конвейер сообщений, ошибки и права
+`ServerStateBase.EnsureRunning()` бросает «The server is not running.», если сервер не работает. Состояния — одиночки (`Instance`). Переход делает сам сервер через `IServerContext.Become(...)`.
 
-В свежем HTTP-стеке обработка разделена по времени:
+Интерфейс сервера разделён по назначению (разделение интерфейсов, SOLID):
 
-```text
-POST /messages
-  → проверка Bearer JWT и принадлежности gameId
-  → whitelist / разбор сообщения / попытка приёма inbox
-  → 202 Accepted (команда ещё может не быть выполнена)
-  → поток игры, игровой скоуп
-  → policy wrapper → player authorization → whitelist → IoC-команда
+| Интерфейс | Что даёт |
+|---|---|
+| `IServerLifecycle` | `Start`, `SoftStop`, `HardStop` |
+| `IServerThreads` | `ThreadCount`, `AddThread` |
+| `IServerAvailability` | `IsRunning`, `EnsureRunning()` |
+| `IServer` | объединяет все три |
+
+Потребитель зависит только от нужного интерфейса: например, перенос игры — от `IServerAvailability`, ребаланс — от `IServerThreads`.
+
+`SoftStop`/`HardStop` убирают потоки из кольца, шлют стоп-команды и возвращают `Task`, завершающийся, когда все потоки закончили. Пока потоки не закончили, сервер уже не «работает» (`IsRunning == false`).
+
+## 10. Сообщения
+
+Формат: `{"gameId": "<строка>", "command": "<строка>", "args": <любой JSON, необязателен>}`. Нарушение формата → `MessageFormatException`.
+
+Цепочка в серверном приложении (по HTTP):
+
+1. `ApiEndpoints` проверяет JWT (§12) и получает `PlayerIdentity`.
+2. `AuthenticatedMessageReceiver.Receive(text)`: разбор → `message.GameId == player.GameId` (иначе `UnauthorizedAccessException`) → белый список (§12) → `GameRegistry.Find(gameId).Send(authenticated)`.
+3. `GameHost` → `PostToGameCommand(runner, InterpretMessageCommand(interpreter, message))` → в ящик потока.
+4. Поток выполняет игру, `InterpretMessageCommand` получает интерпретатор из конвейера и вызывает `Messages.Command.<имя>` с сообщением.
+
+Конвейер интерпретатора собирается декораторами: базовый `IoCMessageInterpreter` → проверка прав игрока (`PlayerAuthorizationInterpreter`) → политика ошибок (`PolicyMessageInterpreter`). Ключ декоратора — `Messages.Decorate`.
+
+## 11. Снимки, перенос, ребаланс, удаление потока
+
+### Снимок игры (JSON)
+
+```json
+{
+  "gameId": "demo",
+  "items": [
+    { "id": "s1", "kind": "Ship",
+      "properties": { "Fuel": {"type": "int", "value": 10}, "Position": {"type": "vector", "value": [12, 5]} } }
+  ],
+  "commands": [ { "type": "message", "gameId": "demo", "command": "…", "args": {…} } ]
+}
 ```
 
-Точный порядок декораторов определяется порядком регистраций: `Messages.Decorate` оборачивает текущий interpreter. В `player-authorization`/E2E права проверяются при Execute, когда доступен storage игры. Асинхронный отказ в исполнении не превращает уже возвращённый 202 в HTTP 403.
+- `JsonValueCodec` кодирует каждое значение как `{"type": <тег>, "value": …}`. Теги зарегистрированы в `RegisterIoCDependencyGameSnapshot`: `int`, `long`, `double`, `bool`, `string`, `angle` (хранится числитель), `vector` (массив). Новый тип — `RegisterIoCDependencyValueType<T>(тег, write, read)`.
+- Какие свойства предмета писать, определяет схема вида `Serialization.Schema.<kind>` (`IoCItemSchema`). Новый вид — `RegisterIoCDependencyItemKind(kind, свойства)`.
+- Из очереди сохраняются **только команды-сообщения** (`MessageCommandSerializer`, тег `message`). Любая другая команда в очереди → `InvalidOperationException` («cannot be serialized»); значение неподдерживаемого типа → `NotSupportedException`; неизвестный тег при чтении → `FormatException`.
+- Восстановление (`Games.Restore`): разбор → `Games.Create` → пост `RestoreItemsCommand` → пост сохранённых команд.
 
-`CommandWhitelist` проверяет имена и до постановки, и при интерпретации (важно для restored/проксированных команд). `ExceptionErrorPolicy` выбирает точное правило типа исключения, затем подходящее базовое; default — Skip. Error actions: Retry с ограничением попыток, Skip, StopGame, StopThread. Повтор не откатывает побочные эффекты команды. Потоковые исключения в server-host проходят через отдельно связанный обработчик, а не игнорируются.
+`SnapshotGameCommand` выполняется на потоке игры, результат отдаёт через приёмник (`sink`). Снимок всего сервера делает `GameSnapshotService`; хранит `ISnapshotStore`: `FileSnapshotStore` пишет файл (`ServerOptions.SnapshotPath`), ключ `Snapshots.Memory` даёт хранилище в памяти.
 
-JWT: подписанный HS256, issuer/audience/exp, нулевой clock skew, UTF-8 ключ минимум 32 байта; обязательны по одному непустому `sub` и `game`, claim `permission=transfer` даёт право на перенос. `AuthenticatedMessage` переносит player id в очередь и сериализатор снимка, а не доверяет полю игрока из входного JSON.
+### Состояния управляемой игры
 
-`player-authorization`: разрешённые команды игрока → целевой id из настроенного аргумента → разрешённые игроку объекты → правила `IAccessRule`. Для существующего объекта стандартное правило проверяет Owner; для CreateItem — Owner создаваемого объекта. Пустые/отсутствующие правила не дают разрешения.
+`GameHostState`: `Running` → `Moving` (идёт перенос или перемещение между потоками) → `Moved` (игра ушла) / `Stopped`. Пауза и буфер сообщений реализованы в `GameHostLifecycle`.
 
-`object-authorization` — **отдельная** модель: объект привязан к access area, area имеет путь предков, grant задаётся субъекту/действию/области. Наследование grant вверх по пути даёт Allow; любое Deny/неизвестное решение запрещает; отсутствие Allow запрещает. Проверка `AuthorizedActionCommand` выполняется перед созданием/исполнением вложенного действия и повторяется при каждом Execute. JWT/HTTP/player rules к этой модели автоматически не подключены.
+### Перенос игры на другой сервер (`GameTransferService`)
 
-## 11. HTTP host и композиция
+1. Сервер берёт замок управления топологией. Если он занят — `ServerOverloadedException` («занято»), чтобы встречные переносы не зависли.
+2. Игра ставится на паузу и снимается в снимок; входящие сообщения **буферизуются** (лимит — ключ `Games.TransferBufferCapacity`; сервер задаёт его равным `InboxCapacity`).
+3. Приёмник создаёт игру из снимка на паузе (`Receive`).
+4. `CommitTransfer`: сервер-источник пересылает буфер (через прокси-хост) и помечает игру `Moved`.
+5. При любой ошибке перенос отменяется (`CancelTransfer`, `Abort`), игра продолжает работать на старом месте.
 
-`SpaceBattle.Http` содержит `Program`, `ApiEndpoints`, `HostComposition`, `appsettings.json`. `ServerComposition.Create` создаёт собственный скоуп и вызывает регистрации foundation → runtime → security → пользовательские команды → policies. Затем восстанавливает предыдущий скоуп и возвращает `ServerApplication` с внедрёнными runtime, validator, receiver, snapshot store.
+Протокол между серверами — интерфейс `IRemoteServer` (`Send`, `Transfer`, `Receive`); `GameRuntime` сам его реализует.
 
-`ServerLifetime : IHostedService` запускает приложение и при остановке ожидает snapshot/soft stop. `ServerOptions` задаёт потоки, inbox, replicas, quantum, приоритеты, игры, схемы, whitelist, JWT и (в player-authorization) права игроков и access rules. `configureCommands` позволяет добавить конкретный протокол команд.
+### Ребаланс и удаление потока
 
-`POST /messages` принимает сообщение, `POST /games/{id}/transfer` — JSON с destination. Ответы: 202/204 при успешном приёме/переносе, 400 для формата, 401 для токена, 403 для синхронного запрета, 404 для неизвестной игры/цели, 503 с Retry-After при перегрузке, 502 при IOException. Внедряемая таблица `IRemoteServer` по умолчанию пуста. Нет endpoint выдачи JWT и автоматической сети server-to-server.
+- `AddThread` добавляет поток и вызывает ребаланс: для каждой запущенной игры считается новый поток по маршруту (§8), и если он другой, игра переезжает (снимок на паузе → восстановление на целевом потоке → `Relocate`).
+- `RemoveThread(id)` убирает поток из кольца, эвакуирует его игры тем же способом, затем останавливает поток. Параллельно с ребалансом это невозможно: общий замок `lifecycle`; пока идёт удаление, `AddThread`/`Stop` отвечают «Thread removal is in progress.».
 
-Текущий appsettings — заготовка: JwtSecret пуст по умолчанию, его нужно задать. В player-authorization дополнительно нужны CommandTargets и Players; одного whitelist недостаточно. Детали запуска — [07](07-playbook.md).
+## 12. Безопасность
 
-## 12. Независимые тики, мир и bounded-load routing
+**JWT** (`RegisterIoCDependencyJwtAuthentication`):
+- алгоритм HS256; ключ — минимум 32 байта UTF-8 (`ServerOptions.JwtSecret`); проверяются издатель, аудитория, подпись, срок (`RequireExpirationTime`, без запаса по часам);
+- утверждения: `sub` — идентификатор игрока, `game` — идентификатор игры, `permission = transfer` — право переносить игру;
+- результат: `PlayerIdentity(PlayerId, GameId, CanTransfer)`.
 
-`game-ticks` выросла от trunk, не от `feature/game`: это инфраструктура расписания с callback `Action<ICommand>` для доставки в игру. `DelayedCommandScheduler` использует TimeProvider, один timer, упорядоченные deadline/sequence и отменяемые доставки. `GameTicks` защищается поколением и номером тика от устаревших/повторных команд, ограничивает catch-up, сохраняет Failure при ошибке шага/доставки. Это отдельный механизм от временного бюджета Game.Execute.
+**Белый список** (`CommandWhitelist`): сообщение с командой не из списка `AllowedCommands` отклоняется (`MessageFormatException` → HTTP 400).
 
-`world-update` добавляет снимок списка объектов на начало WorldStep (`frame.Battle`, `frame.Items`), фабрику и действие WorldStep. JSON-конфигурация задаёт порядок фаз `world` (действие над frame) / `items` (действие над отобранными объектами), возможны дополнительные execution modes. Физика, пары столкновений и очистка уничтоженных объектов должны быть зарегистрированы как действия/селекторы; готового соединения со всеми игровыми ветками здесь нет.
+**Права игрока** (`PlayerAuthorizationCommand`, перед выполнением команды):
+- игроку разрешены команды из `Players.<id>.Commands` и предметы из `Players.<id>.Items` (`*` — все);
+- `CommandTargets` — для каждой команды имя поля в `args`, где лежит идентификатор целевого предмета (например, `"CreateItem": "id"`);
+- правила доступа к предмету: `existing-owner` (по умолчанию: свойство `Owner` предмета равно игроку) и `new-owner` (для `CreateItem`: в `args.properties.Owner` указан тот же игрок). Свои правила регистрируются как `Auth.AccessRule.<имя>`, привязываются через `CommandAccessRules`.
 
-`bounded-load-routing` отдельно реализует альтернативу простому ring.Find: лимит `max(1, ceil((totalWithoutKey + 1) / ring.Count * (1+tolerance)))`; пробы ключей `key`, `key/1`, …, выбор первого ниже лимита или наименее загруженного из проверенных. `PlannedMoves` учитывает ещё выполняющиеся перемещения на целевых потоках. Это ограничение по числу игр, не по CPU/длине очереди; число проб конечно, гарантии глобально оптимального размещения нет. Совместимость со свежим серверным стеком требует разрешения двух конфликтов [01](01-branches.md).
+**Объектная авторизация** (`Authorization/*`, ствол): `AccessAreaTree` — дерево областей, `ObjectAccessAreas` — привязка предмета к области, `AccessGrantStore` — выданные разрешения, `InheritedGrantRule` — разрешает, если разрешение выдано в области предмета или в любой родительской. `AuthorizationPolicy` складывает правила (запрет любого правила — запрет; нужен хотя бы один `Allow`). `AuthorizedActionCommand` выполняет действие только при разрешении, иначе зовёт обработчик отказа. С `Authentication/*` не связана.
+
+## 13. Обработка ошибок
+
+Три уровня:
+
+1. **Серверный поток**: `ServerThread.Handle` ловит любое исключение команды и передаёт в `IExceptionHandler` (журнал). Поток продолжает работать.
+2. **Игра**: `Game.Execute` не ловит ничего; `GameRunner` через `finally` продолжает расписание.
+3. **Политика для команд-сообщений** (`ErrorPolicyCommand`): по типу исключения выбирается действие — `Retry` (с лимитом повторов), `Skip` (по умолчанию), `StopGame`, `StopThread`. Решения пишутся в `ILog`. Подходящее правило ищется сначала по точному типу, затем по базовому. Политика действует только на команды, пришедшие сообщениями.
+
+## 14. Запуск серверного приложения
+
+`ServerComposition.Create(options, snapshots?, configureCommands?, log?)` — единственная точка сборки сервера:
+1. проверяет `ThreadCount`, `InboxCapacity`, `RingReplicas`, `QuantumMilliseconds`;
+2. создаёт скоуп и регистрирует: `ServerFoundation` (фабрики, игра, поток, маршрутизация, сообщения, сервер), `ServerRuntime` (снимки, предметы, виды предметов, управляемые игры, перенос, ребаланс, ограничение нагрузки, удаление потока), `ServerSecurity` (JWT, белый список, правила доступа);
+3. вызывает `configureCommands` — здесь приложение регистрирует свои `Messages.Command.<имя>`;
+4. регистрирует `ServerPolicies` (права игроков, политика ошибок, обработка ошибок потока);
+5. возвращает `ServerApplication`.
+
+`ServerApplication.Start()`: запускает сервер → при `RestoreOnStart` восстанавливает игры из снимка → запускает игры из `Games`. При ошибке мягко останавливает сервер.
+`ServerApplication.Stop()` (однократно): при `SnapshotOnStop` — снимок всех игр и остановка, иначе `SoftStop`.
+
+HTTP (`SpaceBattle.Http`): `Program` собирает хост, `HostComposition` читает секцию `Server` из `appsettings.json`, регистрирует сервер и `ServerLifetime` (запуск/остановка вместе с хостом). Эндпоинты — в [03-modules.md](03-modules.md) §3.18.
+
+## 15. Игровые команды (ствол)
+
+### Столкновения
+- Таблица — файл `*.collisions`: строки `dx dy dvx dvy`, где `d = B.pos − A.pos`, `dv = B.vel − A.vel`.
+- `CollisionTree` — дерево решений по четырём числам, строится рекурсивно.
+- `RegisterIoCDependencyCollisions(dir)` для каждого файла регистрирует ленивое дерево `Collisions.<путь>` и фабрику `Commands.Collision`.
+- `CollisionCommand(tree, offset, onCollision)` вычисляет смещение **в момент `Execute`**.
+- Генератор таблиц: `tools/collisions/generate_collisions.py`.
+
+### Урон (`feature/damage`)
+`ApplyDamageCommand(target, source)`: `Health = max(0, Health − Damage)`. `DestroyIfDeadCommand`: `Health ≤ 0 → Destroyed = true`. Цепочка `Hit` (`Config/Hit.config`): `Context.ApplyDamage` → `Context.DestroyIfDead`.
+
+### Тики и шаг мира
+`GameTicks` вызывает шаг мира с фиксированным периодом через `IDelayedCommandScheduler`, доставляя команды на поток игры (`DeliverGameTickCommand`). Если шаг отстаёт, выполняется до `maxCatchUpTicks` (по умолчанию 2) пропущенных тиков. Старт/остановка — команды `Commands.GameTicks.Start/Stop`. В ветке `world-update` шаг мира собирается из фаз (`WorldStep`), которые описаны в JSON (`phases[]` с полями `name`, `execution` = `World` или `Items`, `action`, `selector`; для `Items` селектор обязателен).

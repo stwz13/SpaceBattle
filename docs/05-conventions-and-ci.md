@@ -1,62 +1,76 @@
-# 05. Ограничения кода, тесты и CI
+# 05. Правила кода, тесты, CI
 
-Проверено по деревьям веток на 2026-11-09. Правила работы с пользовательским клоном — в [AGENTS.md](../AGENTS.md), команды песочницы — в [07](07-playbook.md).
+## 1. Жёсткие ограничения (проверяет `ArchitectureConstraintsTests`, ломают сборку PR)
 
-## 1. Архитектурные ограничения
+Тест разбирает исходники `SpaceBattle.Lib/**/*.cs` (без `obj/` и `bin/`).
 
-`ArchitectureConstraintsTests` разбирает C# через Roslyn:
+| Тест | Правило | Что делать |
+|---|---|---|
+| `Source_Has_No_For_Or_While_Loops` | в любом файле Lib запрещены `for` и `while` (и `do … while`) | `foreach`, LINQ (`Select`, `Where`, `TakeWhile`, `Aggregate`), `Enumerable.Range(0, int.MaxValue).TakeWhile(...)`, рекурсия |
+| `Subject_Code_Has_No_Direct_IoC_Access` | в папках `Commands`, `ValueObjects`, `Threads`, `Receivers`, `Processors`, `Behaviours`, `Queues` нет токенов `Ioc`/`IoC` | зависимости приходят через конструктор; с контейнером работают `Registration/`, `Strategies/`, `Messages/`, `Scopes/`, `Games/`, `Runtime/` и т. д. |
 
-- Во всех исходниках `SpaceBattle.Lib` рекурсивно, кроме `bin`/`obj`, запрещены токены `for` и `while` (включая `do … while`). Разрешены `foreach`, LINQ, рекурсия.
-- В `Commands`, `ValueObjects`, `Threads`, `Receivers`, `Processors`, `Behaviours`, `Queues` запрещены токены `Ioc` и `IoC`. Тест перечисляет непосредственно файлы каждой указанной папки; правило проекта следует соблюдать и во вложенных папках.
-- Глобального запрета на `new` в актуальном trunk нет. Старые foundation/refuel могут содержать более ранние ограничения; проверять тест конкретной ветки.
-- `test/server-e2e` дополнительно вводит `ServerRuntimeArchitectureTests`: в `Runtime`, `Authentication`, `Scheduling` запрещён прямой IoC и создание объектов, кроме явно создаваемых исключений; запрещён и неявный `new(...)`. Зависимости, коллекции, фабрики и стратегии передаются из регистраций.
+Новые «предметные» папки лучше добавить в список теста, чем обходить правило.
+Бывшее правило «`new` только для `Vector`/`Angle`» снято. Тем не менее по принятому в проекте соглашению **объекты создаются в стратегиях IoC и фабриках**, а в предметных классах `new` не нужен; в регистрациях и при создании исключений он допустим.
 
-В свежем серверном стеке выделены узкие интерфейсы жизненного цикла, реестра, снимков, переноса, балансировки, удаления потока и error recovery. IoC-сборка — `Registration/*`, точка композиции приложения — `ServerComposition`, HTTP — отдельный проект. Не переносить service locator в предметные команды.
+## 2. Соглашения по коду
 
-Два `ICommand`: игровой `SpaceBattle.Lib.ICommand`, контейнерный `App.ICommand`. Регистрация/установка скоупа исполняется через `Ioc.Resolve<App.ICommand>(...).Execute()`.
+- `namespace SpaceBattle.Lib;` (file-scoped) в Lib, `namespace SpaceBattle.Tests;` в тестах. Один тип на файл, имя файла = имя типа.
+- Раскладка папок Lib: `Interfaces/`, `Commands/`, `Registration/` (`RegisterIoCDependency<Что> : ICommand`), `Dependencies/<Что>Dependencies.cs` (константы ключей), `Utilities/DependencyNamespaces.<X>.cs` (partial с префиксом), `Config/*.config`; предметные папки: `Games/`, `Threads/`, `Servers/`, `Routing/`, `Messages/`, `Receivers/`, `Runtime/`, `Serialization/`, `Items/`, `Authentication/`, `Scheduling/`, `Collections/` и др.
+- Команда принимает **один** интерфейс-представление (тогда `CommandFinder` её найдёт) либо работает над несколькими предметами через `ICommandContext` с ручной регистрацией.
+- Конструкторы проверяют аргументы: `ArgumentNullException.ThrowIfNull`, `ArgumentException.ThrowIfNullOrWhiteSpace`, `ArgumentOutOfRangeException.ThrowIf…`.
+- Стратегии IoC принимают `object[] args`, сами проверяют их число и типы и бросают `ArgumentException` с понятным текстом.
+- Новое поведение — новый класс и регистрация, старый код не правят (открытость/закрытость). Интерфейсы узкие: потребитель зависит только от нужного (`IServerAvailability`, `IServerThreads`, …).
+- Свежий код использует primary-конструкторы и collection expressions (`[]`).
+- Имена тестов: `Что_Происходит_При_Каких_Условиях`.
 
-## 2. Соглашения и различия веток
+## 3. Git и pull request
 
-- Nullable и implicit usings включены; язык по умолчанию SDK .NET 10. Общий namespace большинства классов Lib — `SpaceBattle.Lib` независимо от подпапки.
-- Ключи брать из `*Dependencies`; динамические имена — через `GeneratedNames`, `Schema`, `CommandKey` и имеющиеся функции.
-- Генератор автоматически находит только публичные команды с суффиксом `Command` и единственным параметром-конструктором — адаптируемым интерфейсом. Интерфейс содержит только свойства, без методов, generic, индексаторов и событий.
-- Контекстные команды над двумя объектами регистрируются явно; нужные адаптеры добавляются через `WithAdapters`.
-- `.config` определяет порядок шагов. Ошибка останавливает макрокоманду, отката уже выполненных шагов нет. Не обобщать «объект не изменился» на любую ошибку всей цепочки.
-- `RegisterIoCDependencyGeneratedStrategies` в актуальном trunk делегирует `GeneratedStrategyRegistration`: прежнее описание двух дублирующих реализаций устарело.
-- В trunk кэш `RoslynSourceCompiler` ещё статический; в `shooting` и свежем серверном стеке — словарь экземпляра, внедряемый через конструктор. Есть `CompilerCacheIsolationTests`. При слиянии не терять исправление.
-- Обычные `GameQueue`/`QueueScheduler` используются из потока-владельца. Потокобезопасность inbox не делает безопасным прямое изменение game storage из HTTP-потока.
-- Вместимость inbox проверяется в `TryAdd`; служебные `Add`/`AddFirst` могут обходить лимит. Stop-команды доставляются и при перегрузке.
-- Управляющие операции managed runtime координируются через lifecycle semaphore; скоупы и контекст исполнения потока нельзя произвольно заменять при рефакторинге.
+- **Conventional Commits**: `feat(server): …`, `fix(routing): …`, `test(game-runner): …`, `refactor(…): …`, `chore: …`.
+- **В дифф PR нет удалённых строк.** PR только добавляет. Правка кода, добавленного этим же PR, вносится в тот коммит, где код появился (`git commit --fixup <sha>` → `git rebase -i --autosquash`).
+- PR идут **стеком**; после правки нижней ветки перебазируйте верхние: `git rebase --onto <новая-основа> <старая-основа> <ветка>`, затем `git push --force-with-lease`.
+- Чужой код (например, `IExceptionFactory`) без согласования с автором не менять.
+- Окончания строк приводятся `core.autocrlf=true`.
 
-## 3. Проверки
+## 4. Тесты
 
-В основных ветках: xUnit 2.9.3, Moq 4.20.72, Microsoft.NET.Test.Sdk 17.14.1, coverlet.collector 6.0.4. HTTP-тесты используют `Microsoft.AspNetCore.Mvc.Testing` 10.0.14 и `WebApplicationFactory<Program>`; отдельный внешний сервер не требуется. JWT-ветки добавляют `Microsoft.IdentityModel.JsonWebTokens` 8.23.0. Точные версии смотреть в `.csproj` соответствующей ветки.
+- Пакеты: xUnit 2.9.3, Moq 4.20.72, coverlet.collector 6.0.4, `Microsoft.NET.Test.Sdk` 17.14.1, `Microsoft.AspNetCore.Mvc.Testing` 10.0.14 (HTTP).
+- Структура: конструктор тест-класса поднимает чистый IoC-скоуп и регистрирует нужное (xUnit создаёт экземпляр на каждый тест — изоляция). Кэш Roslyn делает повторную компиляцию дешёвой.
+- Заглушки — `TestDoubles/`: `TestGameItem`, `RuntimeFixture`, `GameApiFactory`, `ManualTimeProvider`, `FakeHashFunction`, `RecordingExceptionHandler`, `SpyCommandQueue`, `StubServerThread` и др.
+- Конфигурационные файлы берутся из `Path.Combine(AppContext.BaseDirectory, "Config")` либо пишутся во временный каталог.
+- **Не блокируйте задачи в тестах** (`.Wait()`, `.Result`, `Task.WaitAll`): используйте `async Task` и `await task.WaitAsync(timeout)`. Иначе анализатор xUnit1031 выдаёт предупреждения.
+- **IoC-скоуп привязан к потоку** (`ThreadLocal`). После `await` тест может оказаться на другом потоке и потерять скоуп: делайте обращения к `Ioc` до `await` или внутри `ScopeExecution.InScope`.
+- Цель — покрытие каждого изменения выше 90 %.
 
-В scratch-копии (PowerShell):
-
-```powershell
-$env:DOTNET_CLI_UI_LANGUAGE = 'en'
-$env:VSLANG = '1033'
-dotnet restore SpaceBattle/SpaceBattle.slnx
-dotnet build SpaceBattle/SpaceBattle.slnx -c Release --no-restore
-dotnet test SpaceBattle/SpaceBattle.Tests/SpaceBattle.Tests.csproj -c Release --no-build `
-  --collect:'XPlat Code Coverage' --logger 'trx;LogFileName=tests.trx' `
-  --results-directory ./results
+Запуск:
+```bash
+cd SpaceBattle
+dotnet restore SpaceBattle.slnx
+dotnet build   SpaceBattle.slnx -c Release --no-restore
+dotnet test    SpaceBattle.Tests/SpaceBattle.Tests.csproj -c Release --no-build \
+               --collect:"XPlat Code Coverage" --results-directory ./coverage
+# английский вывод на русской Windows:
+DOTNET_CLI_UI_LANGUAGE=en VSLANG=1033 dotnet test ...
 ```
 
-Результат привязывать к SHA. Покрытие Cobertura — метрика инструментированных сборок, а не доказательство выполнения требований преподавателя. В аудите SDK 10.0.300; также установлен 10.0.103. Свежая таблица — [06](06-status.md).
+## 5. CI (`.github/workflows/ci.yml`)
 
-Старые предупреждения `xUnit1031` от блокирующих ожиданий не следует выдавать за текущие: в game/server-thread/game-runner/messages/server-management добавлены async-исправления тестов. В аудите встречается `NU1900`: данные NuGet vulnerability audit не получены, хотя restore/build/test завершаются; повтор restore вне песочницы также дал предупреждение. Успешные тесты не означают успешную проверку уязвимостей.
+- Запускается **только на `pull_request`** (для любых веток). На `push` CI не запускается.
+- `ubuntu-latest`, `actions/setup-dotnet@v4` (`10.0.x`), кэш NuGet, `dotnet restore` / `build -c Release` по `SpaceBattle/SpaceBattle.slnx`, `dotnet test … --collect:"XPlat Code Coverage"`.
+- Отчёт покрытия: `irongut/CodeCoverageSummary` (пороги «70 90») и комментарий в PR. Пороги влияют на цвет отчёта, **сборку не валят**, но цель команды — выше 90 %.
+- Права: `contents: read`, `pull-requests: write`.
+- Бинарные `Assemblies/*.dll` лежат в репозитории (без них CI не соберётся).
 
-## 4. CI
+## 6. Частые ловушки
 
-`.github/workflows/ci.yml` имеет один и тот же git blob во всех 37 проверенных снимках (включая удалённую за время аудита refuel); обе преподавательские DLL также одинаковы во всех этих деревьях:
-
-
-1. Только событие `pull_request`, целевые ветки `['**']`; отдельного `push`-триггера нет.
-2. `ubuntu-latest`, `actions/checkout@v4`, `setup-dotnet@v4` / `10.0.x`, кэш NuGet по `.csproj`.
-3. Restore решения, Release build, test с `--no-build` и `XPlat Code Coverage`.
-4. `irongut/CodeCoverageSummary@v1.3.0`: `thresholds: "70 90"`, Markdown/бейдж; `fail_below_min` в YAML не задан. Это не объявленный в проекте жёсткий coverage gate.
-5. Комментарий в PR через `marocchino/sticky-pull-request-comment@v2`; `contents: read`, `pull-requests: write`.
-
-Статус реальных GitHub Actions по PR в данном аудите не проверялся. Локальные прогоны не обозначаются как «CI зелёный».
+1. Два `ICommand`: `App.ICommand` (с префиксом) и `Lib.ICommand`.
+2. `CommandFinder` находит только команды с **одним** адаптируемым параметром и именем на `Command`. `RefuelCommand(target, source)` и `ApplyDamageCommand` ей не видны: адаптеры заказывают явно (`WithAdapters`), команды создают `…ContextCommand`-регистрации.
+3. Адаптируемый интерфейс — **только свойства**. Нельзя адаптировать интерфейс с методами (`IProjectileFactory`): такие зависимости подаются через `Dependency`.
+4. Порядок шагов в `.config` — порядок выполнения; отката нет.
+5. `Angle` — восьмые доли: `new Angle(9) == new Angle(1)`. `Vector` сравнивается по значению, но это класс.
+6. `GameQueue` и `QueueScheduler` не потокобезопасны. Потокобезопасны: очереди ящика, `GameRegistry`, `ConsistentHashRing`.
+7. Регистрации сервера привязаны к скоупу, текущему на момент `Execute()`.
+8. Кэш Roslyn общий на процесс; первый тест с новым набором интерфейсов заметно дольше.
+9. Игры и сервер запоминают скоуп: при вызове из другого потока оборачивайте обращения в `ScopeExecution.InScope(scope, …)`.
+10. В снимок попадают только команды-сообщения: любая другая команда в очереди ломает снимок (`InvalidOperationException`).
+11. Топологические операции (перенос, ребаланс, удаление потока) взаимно исключаются: при занятости — `ServerOverloadedException`.
+12. Вывод `dotnet` на русской локали: для `grep` по «Passed!» используйте `DOTNET_CLI_UI_LANGUAGE=en VSLANG=1033`.
