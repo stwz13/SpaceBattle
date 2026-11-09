@@ -25,7 +25,8 @@ public sealed class RegisterIoCDependencyManagedGames : ICommand
                 var thread = target ?? Ioc.Resolve<IServerThread>(RoutingDependencies.Thread, game.Id);
                 var runner = new GameRunner(game, thread);
                 var gate = new object();
-                return new ManagedGameHost(game, thread, runner, gate,
+                var hostState = new GameHostLifecycle(gate);
+                var host = new ManagedGameHost(game, thread, runner, gate,
                     (owner, message) => new PostToGameCommand(owner, new InterpretMessageCommand(
                         ScopeExecution.InScope(scope, () => Ioc.Resolve<IMessageInterpreter>(MessagePipelineDependencies.Interpreter)), Normalize(message))),
                     Invoke, (value, sink) => Ioc.Resolve<Lib.ICommand>(SerializationDependencies.Snapshot, value, sink),
@@ -34,7 +35,9 @@ public sealed class RegisterIoCDependencyManagedGames : ICommand
                         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                         targetThread.Add(new PostToGameCommand(owner, new CompletionCommand(action, completion)));
                         return completion.Task;
-                    }, owner => owner.Wake(), new GameHostLifecycle(gate));
+                    }, owner => owner.Wake(), hostState);
+                host.TransferControl = new GameHostTransferService(hostState, gate, host.PauseAndSnapshot, host.ResumeBuffered);
+                return host;
             });
         var games = new GameLifecycle(server, registry, lifecycle, create, hostFactory);
         var snapshots = new GameSnapshotService(server, registry, lifecycle, restore, games);
