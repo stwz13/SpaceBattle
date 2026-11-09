@@ -5,6 +5,13 @@ namespace SpaceBattle.Lib;
 public class RegisterIoCDependencyServerThread : ICommand
 {
     private readonly int _inboxCapacity;
+    private readonly Func<ICommandQueue>? _queueFactory;
+
+    public RegisterIoCDependencyServerThread(int inboxCapacity, Func<ICommandQueue> queueFactory) : this(inboxCapacity)
+    {
+        ArgumentNullException.ThrowIfNull(queueFactory);
+        _queueFactory = queueFactory;
+    }
 
     public RegisterIoCDependencyServerThread(int inboxCapacity = int.MaxValue)
     {
@@ -20,6 +27,10 @@ public class RegisterIoCDependencyServerThread : ICommand
             {
                 throw new ArgumentException("A server thread takes no arguments.");
             }
+            if (_queueFactory is not null)
+                return new ServerThread(_queueFactory(), new BlockingCommandQueue(), new QueueScheduler(),
+                    Ioc.Resolve<IExceptionHandler>(ServerThreadDependencies.ExceptionHandler),
+                    Ioc.Resolve<IExceptionFactory>(ExceptionDependencies.Factory));
             return new ServerThread(new BlockingCommandQueue(_inboxCapacity), new BlockingCommandQueue(), new QueueScheduler(),
                 Ioc.Resolve<IExceptionHandler>(ServerThreadDependencies.ExceptionHandler),
                 Ioc.Resolve<IExceptionFactory>(ExceptionDependencies.Factory));
