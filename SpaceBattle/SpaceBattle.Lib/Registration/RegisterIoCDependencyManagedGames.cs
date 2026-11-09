@@ -13,46 +13,56 @@ public sealed class RegisterIoCDependencyManagedGames : ICommand
         var scope = new GameScope(Ioc.Resolve<object>("IoC.Scope.Current"));
         var server = Ioc.Resolve<IServer>(ServerDependencies.Instance);
         IMessageInterpreter interpreter = new IoCMessageInterpreter();
-        Register("Messages.Interpreter", _ => interpreter);
-        Register(GameDependencies.Create, args => args is [string id] ? Create(id) : throw new ArgumentException("Expected a game id."));
-        var runtime = new GameRuntime(server, new ConcurrentDictionary<string, IGameHost>(), new SemaphoreSlim(1, 1),
-            id => InScope(scope, () => Ioc.Resolve<IManagedGame>(GameDependencies.Create, id)),
-            json => InScope(scope, () => Ioc.Resolve<IManagedGame>(SerializationDependencies.Restore, json)),
-            (game, target) => InScope(scope, () =>
+        IoCRegistrar.Register(MessagePipelineDependencies.Interpreter, _ => interpreter);
+        IoCRegistrar.Register(GameDependencies.Create, args => args is [string id] ? Create(id) : throw new ArgumentException("Expected a game id."));
+        var registry = new ManagedGameRegistry(new ConcurrentDictionary<string, IGameHost>());
+        var lifecycle = new SemaphoreSlim(1, 1);
+        Func<string, IManagedGame> create =
+            id => ScopeExecution.InScope(scope, () => Ioc.Resolve<IManagedGame>(GameDependencies.Create, id));
+        Func<string, IManagedGame> restore = json => ScopeExecution.InScope(scope, () => Ioc.Resolve<IManagedGame>(SerializationDependencies.Restore, json));
+        Func<IManagedGame, IServerThread?, IManagedGameHost> hostFactory = (game, target) => ScopeExecution.InScope(scope, () =>
             {
                 var thread = target ?? Ioc.Resolve<IServerThread>(RoutingDependencies.Thread, game.Id);
                 var runner = new GameRunner(game, thread);
-                return new ManagedGameHost(game, thread, runner, new object(),
+                var gate = new object();
+                return new ManagedGameHost(game, thread, runner, gate,
                     (owner, message) => new PostToGameCommand(owner, new InterpretMessageCommand(
-                        InScope(scope, () => Ioc.Resolve<IMessageInterpreter>("Messages.Interpreter")), Normalize(message))),
+                        ScopeExecution.InScope(scope, () => Ioc.Resolve<IMessageInterpreter>(MessagePipelineDependencies.Interpreter)), Normalize(message))),
                     Invoke, (value, sink) => Ioc.Resolve<Lib.ICommand>(SerializationDependencies.Snapshot, value, sink),
                     (owner, targetThread, action) =>
                     {
                         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                         targetThread.Add(new PostToGameCommand(owner, new CompletionCommand(action, completion)));
                         return completion.Task;
-                    }, owner => ((GameRunner)owner).Wake());
-            }));
+                    }, owner => owner.Wake(), new GameHostLifecycle(gate));
+            });
+        var games = new GameLifecycle(server, registry, lifecycle, create, hostFactory);
+        var snapshots = new GameSnapshotService(server, registry, lifecycle, restore, games);
+        var runtime = new GameRuntime(server, registry, games, snapshots);
+        IoCRegistrar.Register(RuntimeServiceDependencies.Registry, _ => registry);
+        IoCRegistrar.Register(RuntimeServiceDependencies.Lifecycle, _ => lifecycle);
+        IoCRegistrar.Register(RuntimeServiceDependencies.Restore, _ => restore);
+        IoCRegistrar.Register(RuntimeServiceDependencies.HostFactory, _ => hostFactory);
         var serializers = Ioc.Resolve<List<ICommandSerializer>>(SerializationDependencies.CommandSerializers);
         serializers[0] = new MessageCommandSerializer(new DelegatingMessageInterpreter(
-            () => InScope(scope, () => Ioc.Resolve<IMessageInterpreter>("Messages.Interpreter"))));
-        Register("Server.Games", _ => runtime);
-        Register(GameDependencies.Registry, _ => runtime);
-        Register(GameDependencies.Start, args => args switch
+            () => ScopeExecution.InScope(scope, () => Ioc.Resolve<IMessageInterpreter>(MessagePipelineDependencies.Interpreter))));
+        IoCRegistrar.Register(RuntimeDependencies.Games, _ => runtime);
+        IoCRegistrar.Register(GameDependencies.Registry, _ => runtime);
+        IoCRegistrar.Register(GameDependencies.Start, args => args switch
         {
             [string id] => runtime.Start(id),
             [IManagedGame game] => runtime.Start(game),
             _ => throw new ArgumentException("Expected an id or a managed game.")
         });
-        Register("Games.StartRestored", args => args is [IManagedGame game] ? runtime.Start(game)
+        IoCRegistrar.Register(RuntimeDependencies.StartRestored, args => args is [IManagedGame game] ? runtime.Start(game)
             : throw new ArgumentException("Expected a restored managed game."));
-        Register(MessageDependencies.Receiver, _ => new MessageReceiver(Ioc.Resolve<IMessageParser>(MessageDependencies.Parser), runtime));
-        Register("Server.SnapshotAndStop", args => args is [ISnapshotStore store] ? runtime.SnapshotAndStop(store)
+        IoCRegistrar.Register(MessageDependencies.Receiver, _ => new MessageReceiver(Ioc.Resolve<IMessageParser>(MessageDependencies.Parser), runtime));
+        IoCRegistrar.Register(RuntimeDependencies.SnapshotAndStop, args => args is [ISnapshotStore store] ? runtime.SnapshotAndStop(store)
             : throw new ArgumentException("Expected a snapshot store."));
-        Register("Server.Restore", args => args is [ISnapshotStore store] ? runtime.Restore(store)
+        IoCRegistrar.Register(RuntimeDependencies.Restore, args => args is [ISnapshotStore store] ? runtime.Restore(store)
             : throw new ArgumentException("Expected a snapshot store."));
-        Register("Snapshots.Memory", _ => new MemorySnapshotStore(new ConcurrentDictionary<string, string>()));
-        Register("Commands.Server.SnapshotAndStop", args => args is [ISnapshotStore store]
+        IoCRegistrar.Register(RuntimeDependencies.MemorySnapshots, _ => new MemorySnapshotStore(new ConcurrentDictionary<string, string>()));
+        IoCRegistrar.Register(RuntimeDependencies.SnapshotAndStopCommand, args => args is [ISnapshotStore store]
             ? new SnapshotAndStopCommand(runtime, store) : throw new ArgumentException("Expected a snapshot store."));
     }
 
@@ -75,11 +85,10 @@ public sealed class RegisterIoCDependencyManagedGames : ICommand
     private static IMessage Normalize(IMessage message) => message.Args.ValueKind == JsonValueKind.Undefined
         ? new Message(message.GameId, message.Command, JsonSerializer.SerializeToElement<object?>(null)) : message;
 
-    internal static T InScope<T>(IGameScope scope, Func<T> action)
-    {
-        using var entered = scope.Enter();
-        return action();
-    }
-    internal static void Register(string key, Func<object[], object> strategy) =>
-        Ioc.Resolve<App.ICommand>("IoC.Register", key, strategy).Execute();
+    // Forwarders keep independently developed extensions source-compatible during migration.
+    [Obsolete("Use IoCRegistrar.Register instead.")]
+    internal static void Register(string key, Func<object[], object> strategy) => IoCRegistrar.Register(key, strategy);
+    [Obsolete("Use ScopeExecution.InScope instead.")]
+    internal static T InScope<T>(IGameScope scope, Func<T> action) => ScopeExecution.InScope(scope, action);
+
 }
