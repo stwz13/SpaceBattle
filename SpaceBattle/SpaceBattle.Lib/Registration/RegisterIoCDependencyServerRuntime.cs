@@ -10,6 +10,7 @@ public sealed class RegisterIoCDependencyServerRuntime(ServerOptions options) : 
         new RegisterIoCDependencyManagedGames().Execute();
         new RegisterIoCDependencyGameTransfer(options.InboxCapacity).Execute();
         new RegisterIoCDependencyRebalancing().Execute();
+        if (options.LoadTolerance is { } tolerance) new RegisterIoCDependencyBoundedLoadRouting(tolerance, options.LoadProbes).Execute();
         new RegisterIoCDependencyThreadRemoval().Execute();
     }
 }

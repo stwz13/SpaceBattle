@@ -7,6 +7,8 @@ public sealed class ServerOptions
     public int RingReplicas { get; set; } = 64;
     public int QuantumMilliseconds { get; set; } = 10;
     public bool PriorityQueues { get; set; } = true;
+    public double? LoadTolerance { get; set; }
+    public int LoadProbes { get; set; } = 16;
     public string[] Games { get; set; } = [];
     public string[] AllowedCommands { get; set; } = [];
     public Dictionary<string, string[]> ItemKinds { get; set; } = [];
