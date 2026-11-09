@@ -10,6 +10,9 @@ public sealed class ServerOptions
     public string[] Games { get; set; } = [];
     public string[] AllowedCommands { get; set; } = [];
     public Dictionary<string, string[]> ItemKinds { get; set; } = [];
+    public Dictionary<string, string> CommandTargets { get; set; } = [];
+    public Dictionary<string, PlayerAccessOptions> Players { get; set; } = [];
+    public Dictionary<string, string[]> CommandAccessRules { get; set; } = [];
     public bool SnapshotOnStop { get; set; }
     public bool RestoreOnStart { get; set; }
     public string SnapshotPath { get; set; } = "data/server-snapshot.json";

@@ -45,6 +45,8 @@ public class ServerHostTests
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Server:JwtSecret"] = AuthenticationTests.Secret,
+                ["Server:Players:p:Commands:0"] = "CreateItem",
+                ["Server:Players:p:Items:0"] = "s",
                 ["Server:SnapshotPath"] = path,
                 ["Server:ThreadCount"] = "3"
             }));

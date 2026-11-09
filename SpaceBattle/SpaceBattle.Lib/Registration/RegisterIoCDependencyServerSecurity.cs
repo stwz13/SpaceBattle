@@ -6,5 +6,6 @@ public sealed class RegisterIoCDependencyServerSecurity(ServerOptions options) :
     {
         new RegisterIoCDependencyJwtAuthentication(options.JwtIssuer, options.JwtAudience, options.JwtSecret).Execute();
         new RegisterIoCDependencyCommandWhitelist(options.AllowedCommands).Execute();
+        new RegisterIoCDependencyAccessRules().Execute();
     }
 }
