@@ -20,8 +20,11 @@ public class RuntimeAbstractionTests
         host.Setup(value => value.Wake()).Returns(Task.CompletedTask);
         host.Setup(value => value.PauseAndSnapshot()).ReturnsAsync("custom snapshot");
         var store = new Mock<ISnapshotReplacementStore>();
-        IGameRuntime runtime = new GameRuntime(server.Object, new ConcurrentDictionary<string, IGameHost>(),
-            new SemaphoreSlim(1, 1), _ => game.Object, _ => game.Object, (_, _) => host.Object);
+        var registry = new ManagedGameRegistry(new ConcurrentDictionary<string, IGameHost>());
+        var gate = new SemaphoreSlim(1, 1);
+        var lifecycle = new GameLifecycle(server.Object, registry, gate, _ => game.Object, (_, _) => host.Object);
+        IGameRuntime runtime = new GameRuntime(server.Object, registry, lifecycle,
+            new GameSnapshotService(server.Object, registry, gate, _ => game.Object, lifecycle));
         Assert.Same(host.Object, runtime.Start("custom"));
         Assert.Same(host.Object, Assert.Single(runtime.Games));
         var snapshots = await runtime.SnapshotAndStop(store.Object);
