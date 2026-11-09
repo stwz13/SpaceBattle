@@ -18,40 +18,21 @@ public static class ServerComposition
         Ioc.Resolve<App.ICommand>("IoC.Scope.Current.Set", Ioc.Resolve<object>("IoC.Scope.Create")).Execute();
         try
         {
-            new RegisterIoCDependencyExceptionFactory().Execute();
-            new RegisterIoCDependencyBattleContextFactory().Execute();
-            new RegisterIoCDependencyGameItemFactory().Execute();
-            new RegisterIoCDependencyGameQuantum(TimeSpan.FromMilliseconds(options.QuantumMilliseconds)).Execute();
-            new RegisterIoCDependencyGame().Execute();
             var output = log ?? new MemoryLog(new System.Collections.Concurrent.ConcurrentQueue<(string, Exception, ErrorAction, int)>());
-            RegisterIoCDependencyManagedGames.Register(ServerThreadDependencies.ExceptionHandler,
-                _ => new LoggingExceptionHandler(output));
-            if (options.PriorityQueues) new RegisterIoCDependencyPriorityThreads(options.InboxCapacity).Execute();
-            else new RegisterIoCDependencyServerThread(options.InboxCapacity).Execute();
-            new RegisterIoCDependencyRouting(options.RingReplicas).Execute();
-            new RegisterIoCDependencyGameRunner().Execute();
-            new RegisterIoCDependencyMessages().Execute();
-            new RegisterIoCDependencyServer(options.ThreadCount).Execute();
-            new RegisterIoCDependencyGameSnapshot().Execute();
-            new RegisterIoCDependencyGameItems().Execute();
-            options.ItemKinds.ToList().ForEach(kind => new RegisterIoCDependencyItemKind(kind.Key, kind.Value).Execute());
-            new RegisterIoCDependencyManagedGames().Execute();
-            new RegisterIoCDependencyGameTransfer(options.InboxCapacity).Execute();
-            new RegisterIoCDependencyRebalancing().Execute();
-            new RegisterIoCDependencyThreadRemoval().Execute();
-            new RegisterIoCDependencyJwtAuthentication(options.JwtIssuer, options.JwtAudience, options.JwtSecret).Execute();
-            new RegisterIoCDependencyCommandWhitelist(options.AllowedCommands).Execute();
+            new RegisterIoCDependencyServerFoundation(options).Execute();
+            new RegisterIoCDependencyServerRuntime(options).Execute();
+            new RegisterIoCDependencyServerSecurity(options).Execute();
             configureCommands?.Invoke();
-            new RegisterIoCDependencyErrorPolicy(new Dictionary<Type, (ErrorAction, int)>(), output).Execute();
+            new RegisterIoCDependencyServerPolicies(options, output).Execute();
             var scope = new GameScope(Ioc.Resolve<object>("IoC.Scope.Current"));
-            var runtime = Ioc.Resolve<GameRuntime>("Server.Games");
-            var validator = Ioc.Resolve<IPlayerTokenValidator>("Auth.Validator");
+            var runtime = Ioc.Resolve<GameRuntime>(RuntimeDependencies.Games);
+            var validator = Ioc.Resolve<IPlayerTokenValidator>(AuthenticationDependencies.Validator);
             var parser = Ioc.Resolve<IMessageParser>(MessageDependencies.Parser);
-            var whitelist = Ioc.Resolve<ICommandWhitelist>("Messages.Whitelist");
+            var whitelist = Ioc.Resolve<ICommandWhitelist>(MessagePipelineDependencies.Whitelist);
             return new ServerApplication(runtime, validator,
                 player => new AuthenticatedMessageReceiver(parser, runtime, whitelist, player,
-                    (message, identity) => RegisterIoCDependencyManagedGames.InScope(scope,
-                        () => Ioc.Resolve<IMessage>("Messages.Authenticate", message, identity))),
+                    (message, identity) => ScopeExecution.InScope(scope,
+                        () => Ioc.Resolve<IMessage>(AuthenticationDependencies.Authenticate, message, identity))),
                 snapshots ?? new FileSnapshotStore(options.SnapshotPath, new object()), options, new object());
         }
         finally { Ioc.Resolve<App.ICommand>("IoC.Scope.Current.Set", previous).Execute(); }

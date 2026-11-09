@@ -1,6 +1,14 @@
 namespace SpaceBattle.Lib;
 
-public sealed class LoggingExceptionHandler(ILog log) : IExceptionHandler
+public sealed class LoggingExceptionHandler(IErrorRecovery recovery) : IExceptionHandler
 {
-    public void Handle(ICommand command, Exception exception) => log.Write("server", exception, ErrorAction.Skip, 0);
+    public void Handle(ICommand command, Exception exception)
+    {
+        var firstAttempt = true;
+        recovery.Execute(() =>
+        {
+            if (firstAttempt) { firstAttempt = false; throw exception; }
+            command.Execute();
+        });
+    }
 }
