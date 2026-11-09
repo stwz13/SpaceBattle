@@ -1,23 +1,21 @@
 namespace SpaceBattle.Lib;
 
-public enum GameHostState { Running, Moving, Moved, Stopped }
 
 /// <summary>A stable address for a game. All queue access is confined to its owning thread.</summary>
 public sealed partial class ManagedGameHost(
     IManagedGame game, IServerThread thread, IGameRunner runner, object gate,
     Func<IGameRunner, IMessage, ICommand> post, Func<IServerThread, Action, Task> invoke,
     Func<IGame, Action<string>, ICommand> snapshot,
-    Func<IGameRunner, IServerThread, Action, Task> enqueue, Action<IGameRunner> wake) : IManagedGameHost
+    Func<IGameRunner, IServerThread, Action, Task> enqueue, Action<IGameRunner> wake, IGameHostLifecycle lifecycle) : IManagedGameHost
 {
     private IManagedGame _game = game;
     private IServerThread _thread = thread;
     private IGameRunner _runner = runner;
-    private GameHostState _state;
     public IManagedGame Game => _game;
     public IGameRunner Runner => _runner;
     public string Id => _game.Id;
     public IServerThread Thread { get { lock (gate) return _thread; } }
-    public GameHostState State { get { lock (gate) return _state; } }
+    public GameHostState State { get { lock (gate) return lifecycle.State; } }
 
     public void Send(IMessage message)
     {
@@ -26,7 +24,7 @@ public sealed partial class ManagedGameHost(
         {
             if (message.GameId != Id) throw new MessageFormatException("The message belongs to another game.");
             if (SendWhileUnavailable(message)) return;
-            if (_state != GameHostState.Running) throw new ServerOverloadedException("The game is suspended.");
+            if (lifecycle.State != GameHostState.Running) throw new ServerOverloadedException("The game is suspended.");
             if (!_thread.TryAdd(post(_runner, message)))
                 throw new ServerOverloadedException("The game thread is full.");
         }
@@ -57,7 +55,7 @@ public sealed partial class ManagedGameHost(
     {
         lock (gate)
         {
-            if (_state != GameHostState.Running) throw new InvalidOperationException("The game is not running.");
+            if (lifecycle.State != GameHostState.Running) throw new InvalidOperationException("The game is not running.");
             return enqueue(_runner, _thread, action);
         }
     }
@@ -75,8 +73,8 @@ public sealed partial class ManagedGameHost(
         string? json = null;
         lock (gate)
         {
-            if (_state != GameHostState.Running) throw new InvalidOperationException("The game is not running.");
-            _state = GameHostState.Moving;
+            if (lifecycle.State != GameHostState.Running) throw new InvalidOperationException("The game is not running.");
+            lifecycle.BeginMove();
             paused = invoke(_thread, () =>
             {
                 _game.Paused = true;
@@ -91,8 +89,8 @@ public sealed partial class ManagedGameHost(
     public async Task Resume()
     {
         await Wake().ConfigureAwait(false);
-        lock (gate) _state = GameHostState.Running;
+        lock (gate) lifecycle.Resume();
     }
 
-    public void MarkStopped() { lock (gate) _state = GameHostState.Stopped; }
+    public void MarkStopped() { lock (gate) lifecycle.Stop(); }
 }
