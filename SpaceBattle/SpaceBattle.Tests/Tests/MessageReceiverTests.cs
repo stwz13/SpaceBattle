@@ -30,6 +30,7 @@ public class MessageReceiverTests
         public bool Full { get; init; }
 
         public int ThreadId => 0;
+        public bool IsStopping => false;
 
         public Task Start() => throw new NotSupportedException();
 
@@ -61,6 +62,8 @@ public class MessageReceiverTests
         public List<Lib.ICommand> Posted { get; } = [];
 
         public void Post(Lib.ICommand command) => Posted.Add(command);
+
+        public void Wake() => throw new NotSupportedException();
 
         public void Execute() => throw new NotSupportedException();
     }

@@ -17,9 +17,9 @@ public class RegisterIoCDependencyServer : ICommand
         var scope = new GameScope(Ioc.Resolve<object>("IoC.Scope.Current"));
         var server = new Server(
             Ioc.Resolve<IConsistentHashRing<IServerThread>>(RoutingDependencies.Ring),
-            () => InScope(scope, () => Ioc.Resolve<IServerThread>(ServerThreadDependencies.Create)),
-            thread => InScope(scope, () => Ioc.Resolve<Lib.ICommand>(ServerThreadDependencies.SoftStop, thread)),
-            thread => InScope(scope, () => Ioc.Resolve<Lib.ICommand>(ServerThreadDependencies.HardStop, thread)),
+            () => ScopeExecution.InScope(scope, () => Ioc.Resolve<IServerThread>(ServerThreadDependencies.Create)),
+            thread => ScopeExecution.InScope(scope, () => Ioc.Resolve<Lib.ICommand>(ServerThreadDependencies.SoftStop, thread)),
+            thread => ScopeExecution.InScope(scope, () => Ioc.Resolve<Lib.ICommand>(ServerThreadDependencies.HardStop, thread)),
             _threadCount);
         Register(ServerDependencies.Instance, args => Checked(args, server));
         Register(ServerDependencies.Start, args => Checked(args, new StartServerCommand(server)));
@@ -27,11 +27,6 @@ public class RegisterIoCDependencyServer : ICommand
         Register(ServerDependencies.HardStop, args => Checked(args, new HardStopServerCommand(server)));
     }
 
-    private static T InScope<T>(IGameScope scope, Func<T> resolve)
-    {
-        using var entered = scope.Enter();
-        return resolve();
-    }
 
     private static object Checked(object[] args, object result) =>
         args.Length == 0 ? result : throw new ArgumentException("Server dependencies take no arguments.");
