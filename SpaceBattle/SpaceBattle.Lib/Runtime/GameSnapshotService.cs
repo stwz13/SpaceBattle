@@ -14,7 +14,9 @@ public sealed class GameSnapshotService(IServer server, IManagedGameRegistry reg
             var result = games.Select((game, index) => KeyValuePair.Create(game.Id, snapshots[index])).ToDictionary();
             if (store is ISnapshotReplacementStore replacement) replacement.ReplaceAll(result);
             else
-                result.ToList().ForEach(pair => store.Save(pair.Key, pair.Value));
+                if (store is ISnapshotBatchStore batch) batch.SaveAll(result);
+                else
+                    result.ToList().ForEach(pair => store.Save(pair.Key, pair.Value));
             await server.SoftStop().ConfigureAwait(false);
             Array.ForEach(games, game => game.MarkStopped());
             return result;
