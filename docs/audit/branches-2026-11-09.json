@@ -1,0 +1,306 @@
+{
+  "date": "2026-11-09",
+  "remote": "https://github.com/stwz13/SpaceBattle",
+  "branches": [
+    {
+      "ref": "origin/feature/auth",
+      "sha": "b7c19a349a1f2fa5034dfc63747dfbe43fb45a75",
+      "parents": [
+        "origin/feature/error-policy"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/bounded-load-routing",
+      "sha": "90c7c2d5b95673cdafa4dcc283d7e7747ec2a2bf",
+      "parents": [
+        "origin/feature/game-items"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/collisions",
+      "sha": "7c645ae41576f5ef206b401ca9c979e4ca3e1be2",
+      "parents": [
+        "origin/foundation/command-infrastructure"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/command-whitelist",
+      "sha": "b42da92746f5064881d85fa203a9dd4320769cef",
+      "parents": [
+        "origin/feature/priority-queue"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/damage",
+      "sha": "8d0cb28b196b7869069b72c9a599e47d0335f3ae",
+      "parents": [
+        "origin/feature/collisions"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/error-policy",
+      "sha": "700fab2105e220550f7b84935d85e41903f8ed07",
+      "parents": [
+        "origin/feature/command-whitelist"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/game",
+      "sha": "26ca0eeb69d42c1b612e5853fa24fe171236a07b",
+      "parents": [
+        "origin/feature/routing"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/game-items",
+      "sha": "b0be22839e71fdb87fa707166ac8c3d592a48430",
+      "parents": [
+        "origin/feature/game-snapshot"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/game-runner",
+      "sha": "7f531268477f339a83b6407505bb80e7cd0efc81",
+      "parents": [
+        "origin/feature/game"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/game-snapshot",
+      "sha": "fe35341e607ddd895409ed59d45b46cd928721af",
+      "parents": [
+        "origin/feature/server-management"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/game-ticks",
+      "sha": "db73f2a1bf904093cd8ecba2920b38395a151f04",
+      "parents": [
+        "origin/foundation/command-infrastructure"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/game-transfer",
+      "sha": "a40ebcdba78182415b52d68e3f3a17bd2f18bd37",
+      "parents": [
+        "origin/feature/server-snapshot"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/http-api",
+      "sha": "f7806fd811813fbb87dc9001bf4d4451f9a785bd",
+      "parents": [
+        "origin/feature/auth"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/messages",
+      "sha": "525244d8413e56c562cc7be1e435236a8c998e2b",
+      "parents": [
+        "origin/feature/game-runner"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/movement-fuel",
+      "sha": "27db2f8669be38cd0cffbcc5ed3081de0b78c0c1",
+      "parents": [
+        "origin/foundation/command-infrastructure"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/object-authorization",
+      "sha": "66f9e3ab3c28f2e179618cd5833f524fafe7f32a",
+      "parents": [
+        "origin/foundation/command-infrastructure"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/player-authorization",
+      "sha": "02734d6a3524ac8c2445e9e01730337570427f4f",
+      "parents": [
+        "origin/feature/server-host"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/priority-queue",
+      "sha": "33e9de7330802a7c8b33b276ca0783874f882c9a",
+      "parents": [
+        "origin/feature/remove-thread"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/refuel",
+      "sha": "7b0a4e0a4304db1926c7e3505759aa677457b139",
+      "parents": [
+        "origin/main"
+      ],
+      "present_on_remote_at_end": false
+    },
+    {
+      "ref": "origin/feature/remove-thread",
+      "sha": "fd59855186bb28519e89b1c4155ec31cd18ab7ab",
+      "parents": [
+        "origin/feature/thread-rebalance"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/rotation",
+      "sha": "69c05b37077446f6d87bc7cfb29a96e34be2ce10",
+      "parents": [
+        "origin/foundation/command-infrastructure"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/routing",
+      "sha": "4920733182106acd8a6522346803d2c0806aa6f7",
+      "parents": [
+        "origin/feature/server-thread"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/server-host",
+      "sha": "c5b4067d22ac49a86026944026cccedfb5dca908",
+      "parents": [
+        "origin/feature/http-api"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/server-management",
+      "sha": "e6dd9477c1267d72e821309933b96d113ff811f3",
+      "parents": [
+        "origin/feature/messages"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/server-snapshot",
+      "sha": "0c034dc19182f9d93d73809e04f8a0bdc7717062",
+      "parents": [
+        "origin/feature/game-items"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/server-thread",
+      "sha": "306c5de407261476058f473b6172cb4a45d9e1fe",
+      "parents": [
+        "origin/foundation/command-infrastructure"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/shooting",
+      "sha": "3ff48cf0962d9c8de2b165cf15cf68c84f4c174e",
+      "parents": [
+        "origin/foundation/command-infrastructure"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/tanker-refuel",
+      "sha": "aa877623c4092df7eed3fbfbc167876af5ece00b",
+      "parents": [
+        "origin/foundation/command-infrastructure"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/thread-rebalance",
+      "sha": "0bf378501d5fd8e2d9c79398abbc166d137d8fce",
+      "parents": [
+        "origin/feature/game-transfer"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/feature/world-update",
+      "sha": "d4ed09d9e8d234ee00ad63fb7567ec8a94e2a0b9",
+      "parents": [
+        "origin/feature/game-ticks"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/foundation/battle-context",
+      "sha": "3b6cc7725c3eb57954e5991887df34f8988e7c77",
+      "parents": [
+        "origin/foundation/game-item-factory"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/foundation/command-infrastructure",
+      "sha": "b51def2e692a7e466780c76e7081f1ff62b80275",
+      "parents": [
+        "origin/foundation/battle-context",
+        "origin/foundation/specific-command-infrastructure"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/foundation/computed-velocity",
+      "sha": "8381159c721efef0a7fab54622e1a4b42bf53dea",
+      "parents": [
+        "origin/main"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/foundation/game-item-factory",
+      "sha": "39a8b4a58a2f6b20a75eababdce6eb0c0ba052c6",
+      "parents": [
+        "origin/main"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/foundation/specific-command-infrastructure",
+      "sha": "5646e4bb4e0735449b488b15ff962dc008df1871",
+      "parents": [
+        "origin/foundation/computed-velocity"
+      ],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/main",
+      "sha": "a3aecbffd080b9d277865cae81179c5770d14741",
+      "parents": [],
+      "present_on_remote_at_end": true
+    },
+    {
+      "ref": "origin/test/server-e2e",
+      "sha": "496c9616d256d289f7b3e1fd08dc00ea8fb1ab2b",
+      "parents": [
+        "origin/feature/player-authorization"
+      ],
+      "present_on_remote_at_end": true
+    }
+  ],
+  "initial_remote_count": 37,
+  "final_remote_count": 36,
+  "remote_deleted_during_audit": [
+    "feature/refuel"
+  ]
+}

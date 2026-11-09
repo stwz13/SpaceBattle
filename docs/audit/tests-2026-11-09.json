@@ -1,0 +1,1114 @@
+{
+  "date": "2026-11-09",
+  "sdk": "10.0.300",
+  "platform": "Windows",
+  "command": [
+    "dotnet",
+    "test",
+    "<snapshot>/SpaceBattle/SpaceBattle.Tests/SpaceBattle.Tests.csproj",
+    "-c",
+    "Release",
+    "--logger",
+    "trx;LogFileName=tests.trx",
+    "--results-directory",
+    "<results/branch>",
+    "--collect:XPlat Code Coverage"
+  ],
+  "environment": {
+    "DOTNET_CLI_UI_LANGUAGE": "en",
+    "VSLANG": "1033"
+  },
+  "results": [
+    {
+      "ref": "origin/test/server-e2e",
+      "sha": "496c9616d256d289f7b3e1fd08dc00ea8fb1ab2b",
+      "exit": 0,
+      "seconds": 69.3,
+      "counters": {
+        "total": "536",
+        "executed": "536",
+        "passed": "536",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "0.9831",
+        "branch-rate": "0.9154000000000001"
+      }
+    },
+    {
+      "ref": "origin/feature/auth",
+      "sha": "b7c19a349a1f2fa5034dfc63747dfbe43fb45a75",
+      "exit": 0,
+      "seconds": 45.8,
+      "counters": {
+        "total": "494",
+        "executed": "494",
+        "passed": "494",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "0.9883",
+        "branch-rate": "0.9347"
+      }
+    },
+    {
+      "ref": "origin/feature/bounded-load-routing",
+      "sha": "90c7c2d5b95673cdafa4dcc283d7e7747ec2a2bf",
+      "exit": 0,
+      "seconds": 39.9,
+      "counters": {
+        "total": "545",
+        "executed": "545",
+        "passed": "545",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "0.9897",
+        "branch-rate": "0.9437000000000001"
+      }
+    },
+    {
+      "ref": "origin/feature/collisions",
+      "sha": "7c645ae41576f5ef206b401ca9c979e4ca3e1be2",
+      "exit": 0,
+      "seconds": 27.8,
+      "counters": {
+        "total": "252",
+        "executed": "252",
+        "passed": "252",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "1",
+        "branch-rate": "0.9776"
+      }
+    },
+    {
+      "ref": "origin/feature/command-whitelist",
+      "sha": "b42da92746f5064881d85fa203a9dd4320769cef",
+      "exit": 0,
+      "seconds": 37.5,
+      "counters": {
+        "total": "479",
+        "executed": "479",
+        "passed": "479",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "0.9884999999999999",
+        "branch-rate": "0.9467"
+      }
+    },
+    {
+      "ref": "origin/feature/damage",
+      "sha": "8d0cb28b196b7869069b72c9a599e47d0335f3ae",
+      "exit": 0,
+      "seconds": 33.4,
+      "counters": {
+        "total": "271",
+        "executed": "271",
+        "passed": "271",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "1",
+        "branch-rate": "0.9788"
+      }
+    },
+    {
+      "ref": "origin/feature/error-policy",
+      "sha": "700fab2105e220550f7b84935d85e41903f8ed07",
+      "exit": 0,
+      "seconds": 38.9,
+      "counters": {
+        "total": "485",
+        "executed": "485",
+        "passed": "485",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "0.9879000000000001",
+        "branch-rate": "0.9494"
+      }
+    },
+    {
+      "ref": "origin/feature/game",
+      "sha": "26ca0eeb69d42c1b612e5853fa24fe171236a07b",
+      "exit": 0,
+      "seconds": 26.1,
+      "counters": {
+        "total": "321",
+        "executed": "321",
+        "passed": "321",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "1",
+        "branch-rate": "0.9843000000000001"
+      }
+    },
+    {
+      "ref": "origin/feature/game-items",
+      "sha": "b0be22839e71fdb87fa707166ac8c3d592a48430",
+      "exit": 0,
+      "seconds": 27.4,
+      "counters": {
+        "total": "421",
+        "executed": "421",
+        "passed": "421",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "1",
+        "branch-rate": "0.9841"
+      }
+    },
+    {
+      "ref": "origin/feature/game-runner",
+      "sha": "7f531268477f339a83b6407505bb80e7cd0efc81",
+      "exit": 0,
+      "seconds": 26.1,
+      "counters": {
+        "total": "332",
+        "executed": "332",
+        "passed": "332",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "1",
+        "branch-rate": "0.9854999999999999"
+      }
+    },
+    {
+      "ref": "origin/feature/game-snapshot",
+      "sha": "fe35341e607ddd895409ed59d45b46cd928721af",
+      "exit": 0,
+      "seconds": 27.1,
+      "counters": {
+        "total": "416",
+        "executed": "416",
+        "passed": "416",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "1",
+        "branch-rate": "0.9893000000000001"
+      }
+    },
+    {
+      "ref": "origin/feature/game-ticks",
+      "sha": "db73f2a1bf904093cd8ecba2920b38395a151f04",
+      "exit": 0,
+      "seconds": 26.3,
+      "counters": {
+        "total": "226",
+        "executed": "226",
+        "passed": "226",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "0.9859",
+        "branch-rate": "0.9634999999999999"
+      }
+    },
+    {
+      "ref": "origin/feature/game-transfer",
+      "sha": "a40ebcdba78182415b52d68e3f3a17bd2f18bd37",
+      "exit": 0,
+      "seconds": 38.0,
+      "counters": {
+        "total": "467",
+        "executed": "467",
+        "passed": "467",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "0.9911",
+        "branch-rate": "0.9594"
+      }
+    },
+    {
+      "ref": "origin/feature/http-api",
+      "sha": "f7806fd811813fbb87dc9001bf4d4451f9a785bd",
+      "exit": 0,
+      "seconds": 50.7,
+      "counters": {
+        "total": "516",
+        "executed": "516",
+        "passed": "516",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "0.9892",
+        "branch-rate": "0.9387000000000001"
+      }
+    },
+    {
+      "ref": "origin/feature/messages",
+      "sha": "525244d8413e56c562cc7be1e435236a8c998e2b",
+      "exit": 0,
+      "seconds": 27.3,
+      "counters": {
+        "total": "374",
+        "executed": "374",
+        "passed": "374",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "1",
+        "branch-rate": "0.9869"
+      }
+    },
+    {
+      "ref": "origin/feature/movement-fuel",
+      "sha": "27db2f8669be38cd0cffbcc5ed3081de0b78c0c1",
+      "exit": 0,
+      "seconds": 25.3,
+      "counters": {
+        "total": "218",
+        "executed": "218",
+        "passed": "218",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "1",
+        "branch-rate": "0.9741"
+      }
+    },
+    {
+      "ref": "origin/feature/object-authorization",
+      "sha": "66f9e3ab3c28f2e179618cd5833f524fafe7f32a",
+      "exit": 0,
+      "seconds": 24.4,
+      "counters": {
+        "total": "214",
+        "executed": "214",
+        "passed": "214",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "0.9962000000000001",
+        "branch-rate": "0.9743"
+      }
+    },
+    {
+      "ref": "origin/feature/player-authorization",
+      "sha": "02734d6a3524ac8c2445e9e01730337570427f4f",
+      "exit": 0,
+      "seconds": 46.2,
+      "counters": {
+        "total": "534",
+        "executed": "534",
+        "passed": "534",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "0.9831",
+        "branch-rate": "0.9154000000000001"
+      }
+    },
+    {
+      "ref": "origin/feature/priority-queue",
+      "sha": "33e9de7330802a7c8b33b276ca0783874f882c9a",
+      "exit": 0,
+      "seconds": 36.9,
+      "counters": {
+        "total": "473",
+        "executed": "473",
+        "passed": "473",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "0.9884000000000001",
+        "branch-rate": "0.9473999999999999"
+      }
+    },
+    {
+      "ref": "origin/feature/refuel",
+      "sha": "7b0a4e0a4304db1926c7e3505759aa677457b139",
+      "exit": 0,
+      "seconds": 21.6,
+      "counters": {
+        "total": "62",
+        "executed": "62",
+        "passed": "62",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "0.9965",
+        "branch-rate": "0.9545"
+      }
+    },
+    {
+      "ref": "origin/feature/remove-thread",
+      "sha": "fd59855186bb28519e89b1c4155ec31cd18ab7ab",
+      "exit": 0,
+      "seconds": 34.6,
+      "counters": {
+        "total": "470",
+        "executed": "470",
+        "passed": "470",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "0.988",
+        "branch-rate": "0.9504"
+      }
+    },
+    {
+      "ref": "origin/feature/rotation",
+      "sha": "69c05b37077446f6d87bc7cfb29a96e34be2ce10",
+      "exit": 0,
+      "seconds": 26.0,
+      "counters": {
+        "total": "213",
+        "executed": "213",
+        "passed": "213",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "1",
+        "branch-rate": "0.9736"
+      }
+    },
+    {
+      "ref": "origin/feature/routing",
+      "sha": "4920733182106acd8a6522346803d2c0806aa6f7",
+      "exit": 0,
+      "seconds": 26.0,
+      "counters": {
+        "total": "288",
+        "executed": "288",
+        "passed": "288",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "1",
+        "branch-rate": "0.9834999999999999"
+      }
+    },
+    {
+      "ref": "origin/feature/server-host",
+      "sha": "c5b4067d22ac49a86026944026cccedfb5dca908",
+      "exit": 0,
+      "seconds": 47.3,
+      "counters": {
+        "total": "524",
+        "executed": "524",
+        "passed": "524",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "0.9862000000000001",
+        "branch-rate": "0.9343"
+      }
+    },
+    {
+      "ref": "origin/feature/server-management",
+      "sha": "e6dd9477c1267d72e821309933b96d113ff811f3",
+      "exit": 0,
+      "seconds": 42.9,
+      "counters": {
+        "total": "403",
+        "executed": "403",
+        "passed": "403",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "1",
+        "branch-rate": "0.9876"
+      }
+    },
+    {
+      "ref": "origin/feature/server-snapshot",
+      "sha": "0c034dc19182f9d93d73809e04f8a0bdc7717062",
+      "exit": 0,
+      "seconds": 41.4,
+      "counters": {
+        "total": "458",
+        "executed": "458",
+        "passed": "458",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "0.9917",
+        "branch-rate": "0.9634999999999999"
+      }
+    },
+    {
+      "ref": "origin/feature/server-thread",
+      "sha": "306c5de407261476058f473b6172cb4a45d9e1fe",
+      "exit": 0,
+      "seconds": 26.1,
+      "counters": {
+        "total": "247",
+        "executed": "247",
+        "passed": "247",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "1",
+        "branch-rate": "0.9804999999999999"
+      }
+    },
+    {
+      "ref": "origin/feature/shooting",
+      "sha": "3ff48cf0962d9c8de2b165cf15cf68c84f4c174e",
+      "exit": 0,
+      "seconds": 33.1,
+      "counters": {
+        "total": "221",
+        "executed": "221",
+        "passed": "221",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "1",
+        "branch-rate": "0.9745"
+      }
+    },
+    {
+      "ref": "origin/feature/tanker-refuel",
+      "sha": "aa877623c4092df7eed3fbfbc167876af5ece00b",
+      "exit": 0,
+      "seconds": 23.3,
+      "counters": {
+        "total": "216",
+        "executed": "216",
+        "passed": "216",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "1",
+        "branch-rate": "0.975"
+      }
+    },
+    {
+      "ref": "origin/feature/thread-rebalance",
+      "sha": "0bf378501d5fd8e2d9c79398abbc166d137d8fce",
+      "exit": 0,
+      "seconds": 38.9,
+      "counters": {
+        "total": "468",
+        "executed": "468",
+        "passed": "468",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "0.9895",
+        "branch-rate": "0.9556"
+      }
+    },
+    {
+      "ref": "origin/feature/world-update",
+      "sha": "d4ed09d9e8d234ee00ad63fb7567ec8a94e2a0b9",
+      "exit": 0,
+      "seconds": 26.3,
+      "counters": {
+        "total": "274",
+        "executed": "274",
+        "passed": "274",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "0.9845",
+        "branch-rate": "0.9582999999999999"
+      }
+    },
+    {
+      "ref": "origin/foundation/battle-context",
+      "sha": "3b6cc7725c3eb57954e5991887df34f8988e7c77",
+      "exit": 0,
+      "seconds": 25.2,
+      "counters": {
+        "total": "192",
+        "executed": "192",
+        "passed": "192",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "0.9978",
+        "branch-rate": "0.9647"
+      }
+    },
+    {
+      "ref": "origin/foundation/command-infrastructure",
+      "sha": "b51def2e692a7e466780c76e7081f1ff62b80275",
+      "exit": 0,
+      "seconds": 25.7,
+      "counters": {
+        "total": "193",
+        "executed": "193",
+        "passed": "193",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "1",
+        "branch-rate": "0.9736"
+      }
+    },
+    {
+      "ref": "origin/foundation/computed-velocity",
+      "sha": "8381159c721efef0a7fab54622e1a4b42bf53dea",
+      "exit": 0,
+      "seconds": 21.7,
+      "counters": {
+        "total": "97",
+        "executed": "97",
+        "passed": "97",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "0.9965",
+        "branch-rate": "0.9545"
+      }
+    },
+    {
+      "ref": "origin/foundation/game-item-factory",
+      "sha": "39a8b4a58a2f6b20a75eababdce6eb0c0ba052c6",
+      "exit": 0,
+      "seconds": 28.4,
+      "counters": {
+        "total": "156",
+        "executed": "156",
+        "passed": "156",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "0.9976",
+        "branch-rate": "0.9647"
+      }
+    },
+    {
+      "ref": "origin/foundation/specific-command-infrastructure",
+      "sha": "5646e4bb4e0735449b488b15ff962dc008df1871",
+      "exit": 0,
+      "seconds": 25.5,
+      "counters": {
+        "total": "140",
+        "executed": "140",
+        "passed": "140",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "1",
+        "branch-rate": "0.9736"
+      }
+    },
+    {
+      "ref": "origin/main",
+      "sha": "a3aecbffd080b9d277865cae81179c5770d14741",
+      "exit": 0,
+      "seconds": 16.7,
+      "counters": {
+        "total": "0",
+        "executed": "0",
+        "passed": "0",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "1",
+        "branch-rate": "1"
+      }
+    }
+  ],
+  "integration": [
+    {
+      "name": "integration",
+      "sha": "f71592e7401ebf7fe7f4484ecff3eb433567163a",
+      "counters": {
+        "total": "810",
+        "executed": "810",
+        "passed": "809",
+        "failed": "1",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "0.9825",
+        "branch-rate": "0.9267"
+      }
+    },
+    {
+      "name": "integration-without-ticks",
+      "sha": "f5b41ed21370d39ce0cfd78cbb9e30672f0b6969",
+      "counters": {
+        "total": "729",
+        "executed": "729",
+        "passed": "729",
+        "failed": "0",
+        "error": "0",
+        "timeout": "0",
+        "aborted": "0",
+        "inconclusive": "0",
+        "passedButRunAborted": "0",
+        "notRunnable": "0",
+        "notExecuted": "0",
+        "disconnected": "0",
+        "warning": "0",
+        "completed": "0",
+        "inProgress": "0",
+        "pending": "0"
+      },
+      "coverage": {
+        "line-rate": "0.9845999999999999",
+        "branch-rate": "0.9229"
+      }
+    }
+  ],
+  "note": "37 tree snapshots tested: 36 final GitHub branches plus feature/refuel deleted remotely during the audit. main has zero tests."
+}
