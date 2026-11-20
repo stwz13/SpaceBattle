@@ -154,3 +154,9 @@
 Для игровых действий: `CodeGeneration` → `GeneratedStrategies…` → `Macro` → `ActionComposition`/`ContextActionComposition` → `ActionConfigurations(dir)` → `Context.*`-команды. Ключи шагов должны существовать к моменту `Resolve`, а не к моменту регистрации.
 
 ⚠ `RegisterIoCDependencyServer` и `ManagedGames` запоминают **текущий** скоуп на момент `Execute()`: потоки, игры и стоп-команды создаются внутри него.
+
+## L. Правила отдельной партии
+
+`RegisterIoCDependencyRuleCommand` публикует фабрику шага под ключом `GameRules.Steps.<имя>.Factory`. Она принимает аргументы композиции и возвращает игровую `ICommand`. Для существующей игровой регистрации можно использовать `FromExisting(key)`.
+
+При старте партии её `<Action>.Config` возвращает упорядоченный массив ключей `GameRules.Steps.<имя>.Create`. Каждый такой ключ обращается к фабрике в текущем скоупе при сборке действия. Фабрику можно добавить после согласования. Согласованные определения записываются в `extensions.actionRules` снимка и восстанавливаются через `Serialization.RestoreExtension.actionRules` до загрузки очереди команд.
