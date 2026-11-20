@@ -4,7 +4,7 @@ namespace SpaceBattle.Tests;
 
 public class GameTransferTests
 {
-    public static void Configure(RuntimeFixture fixture)
+    internal static void Configure(RuntimeFixture fixture)
     {
         using var entered = fixture.Scope.Enter();
         new RegisterIoCDependencyGameTransfer(100).Execute();

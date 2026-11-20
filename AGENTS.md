@@ -26,10 +26,10 @@ SpaceBattle — игровой сервер для сетевой игры «К�
     ├── Assemblies/            core.dll, scopes.dll (готовые, исходников нет)
     ├── SpaceBattle.Lib/       вся логика
     ├── SpaceBattle.Tests/     тесты (Tests/) и тестовые заглушки (TestDoubles/)
-    └── SpaceBattle.Http/      HTTP-слой (ASP.NET Core) — только в серверных ветках
+    └── SpaceBattle.Http/      HTTP-слой (ASP.NET Core)
 ```
 
-Состав каждой ветки отличается: в одних есть серверный стек, в других — игровые команды. Что где лежит, написано в `docs/01-branches.md`.
+В `main` серверный стек и игровые команды входят в одно решение. История веток описана в `docs/01-branches.md`.
 
 ## Правила работы
 

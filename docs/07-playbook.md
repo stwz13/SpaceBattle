@@ -9,12 +9,14 @@
 
 ## 1. Запустить HTTP-сервер
 
-Нужна ветка с серверным стеком (`feature/server-host` или выше), в ней проект `SpaceBattle.Http`.
+Проект `SpaceBattle.Http` входит в решение ветки `main`.
 
 ```bash
 cd SpaceBattle
 export Server__JwtSecret="замените-на-секрет-не-короче-32-байт-0000"
-dotnet run --project SpaceBattle.Http
+export Server__Players__p1__Commands__0=CreateItem
+export Server__Players__p1__Items__0='*'
+dotnet run --project SpaceBattle.Http -- --urls http://localhost:5000
 ```
 
 Настройки — секция `Server` в `SpaceBattle.Http/appsettings.json` (переопределяются переменными окружения вида `Server__ThreadCount`):
@@ -28,13 +30,13 @@ dotnet run --project SpaceBattle.Http
 | `PriorityQueues` | true | приоритетные очереди вместо обычных |
 | `LoadTolerance` | не задан | включает ограничение нагрузки (`bounded-load-routing`), допуск, например `0.25` |
 | `LoadProbes` | 16 | число попыток подбора потока при ограничении нагрузки |
-| `Games` | `[]` | игры, запускаемые при старте |
-| `AllowedCommands` | `[]` | белый список команд |
-| `CommandTargets` | `{}` | команда → имя поля `args` с id целевого предмета |
+| `Games` | `["demo"]` | игры, запускаемые при старте |
+| `AllowedCommands` | `["CreateItem"]` | белый список команд |
+| `CommandTargets` | `{"CreateItem":"id"}` | команда → имя поля `args` с id целевого предмета |
 | `Players` | `{}` | `{ "p1": { "Commands": ["CreateItem"], "Items": ["*"] } }` |
 | `CommandAccessRules` | `{}` | команда → список правил доступа (`existing-owner`, `new-owner`, свои) |
-| `ItemKinds` | `{}` | вид → свойства для снимка (`{"Ship": ["Fuel","Owner"]}`) |
-| `SnapshotOnStop`, `RestoreOnStart` | false | снимок при остановке и восстановление при старте |
+| `ItemKinds` | `{"Ship":["Fuel","Owner"]}` | вид → свойства для снимка |
+| `SnapshotOnStop`, `RestoreOnStart` | true | снимок при остановке и восстановление при старте |
 | `SnapshotPath` | `data/server-snapshot.json` | файл снимка |
 | `JwtIssuer`, `JwtAudience`, `JwtSecret` | `SpaceBattle`, `Players`, пусто | параметры JWT; секрет не короче 32 байт |
 
@@ -106,7 +108,7 @@ await app.Stop();
 
 ## 8. Новая регистрация IoC
 
-Класс `Registration/RegisterIoCDependencyXxx : ICommand`, в `Execute()` — `Ioc.Resolve<App.ICommand>("IoC.Register", Key, (object[] args) => …).Execute()` (внутри Lib можно короче: `IoCRegistrar.Register`, он internal). Ключ — константа в `Dependencies/XxxDependencies.cs`. Проверять `args.Length` и типы, бросать `ArgumentException`. Тест регистрации: ключ резолвится, неверные аргументы → `ArgumentException`, поведение внутри нужного скоупа.
+В `SpaceBattle.Lib` создайте `Registration/RegisterIoCDependencyXxx : ICommand` и вызовите `IoCRegistrar.Register(Key, strategy)` из `Execute()`. Общий метод регистрирует стратегию в текущем скоупе. Ключ храните в `Dependencies/XxxDependencies.cs`. Стратегия проверяет число и типы аргументов и выдаёт `ArgumentException` при неверном вызове. В тесте регистрации проверьте разрешение ключа, неверные аргументы и поведение в нужном скоупе.
 
 ## 9. Перестроить стек PR после правки нижней ветки
 

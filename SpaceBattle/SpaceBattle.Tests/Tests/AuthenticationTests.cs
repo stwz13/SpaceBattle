@@ -40,7 +40,7 @@ public class AuthenticationTests
             Claims = new Dictionary<string, object> { ["sub"] = player, ["game"] = game, ["permission"] = transfer ? "transfer" : "play" }
         });
 
-    public static void Configure(RuntimeFixture fixture)
+    internal static void Configure(RuntimeFixture fixture)
     {
         using var scope = fixture.Scope.Enter();
         new RegisterIoCDependencyJwtAuthentication("SpaceBattle", "Players", Secret).Execute();

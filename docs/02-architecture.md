@@ -3,7 +3,7 @@
 Язык и платформа: C# 14, **.NET 10** (`net10.0`), `Nullable=enable`, `ImplicitUsings=enable`.
 Пакеты: Roslyn (`Microsoft.CodeAnalysis.CSharp` 4.14.0) для генерации адаптеров, `Microsoft.IdentityModel.JsonWebTokens` 8.23.0 для JWT, ASP.NET Core в `SpaceBattle.Http`. Тесты: xUnit 2.9.3, Moq 4.20.72, coverlet.
 
-Описание относится к серверному стеку (`feature/server-host` и выше) и к стволу игровых команд. Где что лежит — [01-branches.md](01-branches.md).
+Описание относится к серверному стеку и игровым командам в `main`. История интеграции — в [01-branches.md](01-branches.md).
 
 ## 1. Сборки и проекты
 
@@ -130,7 +130,7 @@ Commands.SpaceBattle_Lib_BurnFuelCommand
 
 `ServerThread` сам является командой. Запуск — `Task.Factory.StartNew(Run, LongRunning)`, повторный старт → исключение. У потока:
 
-- **входящий ящик** (`ICommandQueue`) — в серверных ветках приоритетная очередь `PriorityCommandQueue` (по умолчанию включена, `ServerOptions.PriorityQueues`), внутри одного приоритета порядок FIFO;
+- **входящий ящик** (`ICommandQueue`) — по умолчанию `PriorityCommandQueue` (`ServerOptions.PriorityQueues`), с порядком FIFO внутри одного приоритета;
 - **планировщик** (`QueueScheduler`) — команды игр, которые надо выполнить;
 - обработчик исключений `IExceptionHandler`: `Handle` ловит исключение любой команды и передаёт обработчику (в сервере это `LoggingExceptionHandler`).
 
@@ -144,7 +144,7 @@ Commands.SpaceBattle_Lib_BurnFuelCommand
 
 `ConsistentHashRing<TNode>` — кольцо с виртуальными узлами. Ключ — `gameId`, узел — `IServerThread`. Позиции узла считаются как `hash("{id}#{replica}")`. Хэш по умолчанию — `FnvHashFunction` (есть и `Sha256HashFunction`). Пустое кольцо → `InvalidOperationException("The ring has no nodes.")`.
 
-### Ограничение нагрузки (`feature/bounded-load-routing`)
+### Ограничение нагрузки
 
 Обычное кольцо может посадить несколько тяжёлых игр на один поток. `BoundedLoadRouter` оставляет владельца с кольца, пока на нём игр меньше `ceil((игр + 1) / потоков × (1 + tolerance))`; иначе пробует ключ `key/1`, `key/2`, … (до `LoadProbes` попыток), а если все заняты — берёт наименее загруженный. Включается опцией `ServerOptions.LoadTolerance`. Нагрузку считает `PlacementLoadMeter` по играм, живущим на каждом потоке, включая переносимые (`PlannedMoves`). Тот же маршрут используют ребаланс и удаление потока.
 
@@ -222,7 +222,7 @@ Commands.SpaceBattle_Lib_BurnFuelCommand
 4. `CommitTransfer`: сервер-источник пересылает буфер (через прокси-хост) и помечает игру `Moved`.
 5. При любой ошибке перенос отменяется (`CancelTransfer`, `Abort`), игра продолжает работать на старом месте.
 
-Протокол между серверами — интерфейс `IRemoteServer` (`Send`, `Transfer`, `Receive`); `GameRuntime` сам его реализует.
+Принимающий сервер представлен интерфейсом `IRemoteServer` с методами `Send` и `Receive`. Его реализует `GameRuntime`. Перенос инициируется через `GameRuntime.Transfer` на исходном сервере.
 
 ### Ребаланс и удаление потока
 
@@ -267,7 +267,7 @@ Commands.SpaceBattle_Lib_BurnFuelCommand
 
 HTTP (`SpaceBattle.Http`): `Program` собирает хост, `HostComposition` читает секцию `Server` из `appsettings.json`, регистрирует сервер и `ServerLifetime` (запуск/остановка вместе с хостом). Эндпоинты — в [03-modules.md](03-modules.md) §3.18.
 
-## 15. Игровые команды (ствол)
+## 15. Игровые команды
 
 ### Столкновения
 - Таблица — файл `*.collisions`: строки `dx dy dvx dvy`, где `d = B.pos − A.pos`, `dv = B.vel − A.vel`.
@@ -276,7 +276,7 @@ HTTP (`SpaceBattle.Http`): `Program` собирает хост, `HostComposition
 - `CollisionCommand(tree, offset, onCollision)` вычисляет смещение **в момент `Execute`**.
 - Генератор таблиц: `tools/collisions/generate_collisions.py`.
 
-### Урон (`feature/damage`)
+### Урон
 `ApplyDamageCommand(target, source)`: `Health = max(0, Health − Damage)`. `DestroyIfDeadCommand`: `Health ≤ 0 → Destroyed = true`. Цепочка `Hit` (`Config/Hit.config`): `Context.ApplyDamage` → `Context.DestroyIfDead`.
 
 ### Тики и шаг мира

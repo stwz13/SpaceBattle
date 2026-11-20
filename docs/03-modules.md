@@ -6,7 +6,7 @@
 Имена команд определяют ключи `Commands.<M(тип)>` (точки в имени типа → `_`).
 
 ---
-## Часть A. Игровые команды (ствол `foundation/command-infrastructure` и ветки damage / world-update)
+## Часть A. Игровые команды
 
 ### 3.1 Инфраструктура
 
@@ -72,7 +72,7 @@
 - Контекстная команда: двое по ролям + дерево + имя последствия (`ContextAction`).
 - Тесты (в ветках collisions/damage): `CollisionFileTests`, `CollisionTreeTests`, `CollisionCommandTests`, `CollisionRegistrationTests`, `CollisionContextCommandTests`.
 
-### 3.7 Урон (`feature/damage`)
+### 3.7 Урон
 
 `ApplyDamageCommand(IDamageTarget{Health get/set}, IDamageSource{Damage})`, `DestroyIfDeadCommand(IDestructible{Health, Destroyed get/set})`, `RegisterIoCDependencyDamageContextCommand(depKey, targetRole, sourceRole)`. `Config/Hit.config` = `Context.ApplyDamage`, `Context.DestroyIfDead`.
 Полная сборка попадания: `RegisterIoCDependencyCollisionContextCommand("Commands.Hit.Collision", "Collisions.Ship-Torpedo", "Target", "Source", "Hit")`.
@@ -93,7 +93,6 @@
 - `WorldStepFactory` создаёт «кадр» — предмет со свойствами `Battle` и `Items` (снимок хранилища) — и вызывает действие `WorldStep` (`Commands.Action`).
 - Фазы задаются JSON: `{"phases":[{"name":"…","execution":"World"|"Items","action":"…","selector":"…"}]}`. `World` — действие над кадром; `Items` — действие для каждого предмета, прошедшего селектор (`Func<IGameItem,bool>` по ключу `selector`); для `World` селектор указывать нельзя.
 - Загрузка и регистрация: `RegisterIoCDependencyWorldPhaseConfigurationLoader` → `RegisterIoCDependencyConfiguredWorldPhases(path[, action])`. Дубли имён фаз и подмена `Commands.Action`/`Commands.Macro` запрещены (`FormatException`).
-- Возможное ограничение при интеграции: по более раннему аудиту добавление этих веток к серверному стеку упирается в архитектурный тест по папке `Scheduling` (не перепроверялось, уточнить при слиянии).
 
 ### 3.9 Объектная авторизация (`Authorization/*`)
 

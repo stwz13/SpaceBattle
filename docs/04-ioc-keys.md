@@ -127,9 +127,9 @@
 | `Auth.Validator` | `IPlayerTokenValidator` | `…JwtAuthentication(issuer, audience, secret)` |
 | `Auth.AccessRule.<имя>` | `IAccessRule` (`existing-owner`, `new-owner`, свои) | `…AccessRules` |
 | `Auth.CommandRules` | `IPlayerCommandRules` | `…PlayerAuthorization` |
-| `Authorization.Policy`, `Factories.AuthorizedAction`, `Commands.AuthorizedAction` | объектная авторизация (ствол) | `…AuthorizedActions(policy)` |
+| `Authorization.Policy`, `Factories.AuthorizedAction`, `Commands.AuthorizedAction` | объектная авторизация | `…AuthorizedActions(policy)` |
 
-## J. Тики и шаг мира (ствол, `world-update`)
+## J. Тики и шаг мира
 
 | Ключ | Аргументы | Результат |
 |---|---|---|
