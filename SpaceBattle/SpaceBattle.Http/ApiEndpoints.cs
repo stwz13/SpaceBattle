@@ -40,6 +40,9 @@ public static class ApiEndpoints
         });
     }
 
+    internal static Task<PlayerIdentity?> AuthenticatePlayer(HttpContext context, IPlayerTokenValidator tokens) =>
+        Authenticate(context, tokens);
+
     private static async Task<PlayerIdentity?> Authenticate(HttpContext context, IPlayerTokenValidator tokens)
     {
         var header = context.Request.Headers.Authorization.ToString();
