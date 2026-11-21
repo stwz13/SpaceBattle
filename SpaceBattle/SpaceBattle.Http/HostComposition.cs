@@ -22,7 +22,7 @@ public static class HostComposition
         services.TryAddSingleton(provider => ServerComposition.Create(provider.GetRequiredService<ServerOptions>(),
             configureCommands: () => provider.GetRequiredService<GameRuleRooms>().Bind(
                 GameRuleComposition.Configure(provider.GetServices<RegisterIoCDependencyRuleCommand>(),
-                    provider.GetRequiredService<GameRuleParameterCatalog>())),
+                    provider.GetRequiredService<GameRuleParameterCatalog>(), provider.GetServices<FleetContextOrder>())),
             log: new ApplicationLog(provider.GetRequiredService<ILogger<ApplicationLog>>())));
         services.TryAddSingleton<IServerApplication>(provider => provider.GetRequiredService<ServerApplication>());
         services.TryAddSingleton<IReadOnlyDictionary<string, IRemoteServer>>(_ => new Dictionary<string, IRemoteServer>());

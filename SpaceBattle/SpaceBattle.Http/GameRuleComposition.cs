@@ -5,7 +5,7 @@ namespace SpaceBattle.Http;
 internal static class GameRuleComposition
 {
     public static AgreedGameStarter Configure(IEnumerable<RegisterIoCDependencyRuleCommand> extensions,
-        GameRuleParameterCatalog parameters)
+        GameRuleParameterCatalog parameters, IEnumerable<FleetContextOrder> orders)
     {
         new RegisterIoCDependencyCodeGeneration().Execute();
         new RegisterIoCDependencyComputedVelocity().Execute();
@@ -20,6 +20,8 @@ internal static class GameRuleComposition
         new RegisterIoCDependencyMacroCommand().Execute();
         new RegisterIoCDependencyActionComposition().Execute();
         new RegisterIoCDependencyContextActionComposition().Execute();
+        var fleetOrders = orders.Append(new FleetContextOrder("Refuel", "Source", ["Target"])).ToArray();
+        new RegisterIoCDependencyFleetOrders(fleetOrders).Execute();
         var directory = Path.Combine(AppContext.BaseDirectory, "Config");
         new RegisterIoCDependencyActionConfigurations(directory).Execute();
         var modules = extensions.ToDictionary(extension => extension.Name, StringComparer.Ordinal);
@@ -27,6 +29,6 @@ internal static class GameRuleComposition
             .SelectMany(path => (string[])ActionConfigurationStrategy.Create(path)([])).Except(modules.Keys, StringComparer.Ordinal))
             RegisterIoCDependencyRuleCommand.FromExisting(step).Execute();
         foreach (var extension in modules.Values) extension.Execute();
-        return GameRulesComposition.CreateStarter(parameters);
+        return GameRulesComposition.CreateStarter(parameters, fleetOrders.Select(order => order.Action));
     }
 }

@@ -1,6 +1,6 @@
 namespace SpaceBattle.Lib;
 
-public sealed class GameRulesLobby : IGameRulesLobby, IConfirmedGameStart
+public sealed class GameRulesLobby : IGameRulesLobby, IConfirmedGameStart, IFleetRoster
 {
     private readonly object _gate = new();
     private readonly HashSet<string> _participants;
@@ -19,10 +19,12 @@ public sealed class GameRulesLobby : IGameRulesLobby, IConfirmedGameStart
         if (roster.Length == 0 || roster.Length != _participants.Count || roster.Any(string.IsNullOrWhiteSpace))
             throw new ArgumentException("A lobby requires a nonempty roster of distinct player IDs.", nameof(participants));
         GameId = gameId;
+        Participants = Array.AsReadOnly(roster);
         _parameters = parameters ?? GameRuleParameterCatalog.Standard;
     }
 
     public string GameId { get; }
+    public IReadOnlyList<string> Participants { get; }
 
     public GameRulesProposal? ForParticipant(string playerId)
     {
