@@ -13,6 +13,7 @@
 
     <ItemGroup>
         <None Update="Config\*.config" CopyToOutputDirectory="PreserveNewest" />
+        <None Update="Config\ObjectRules.json" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
     <ItemGroup>
