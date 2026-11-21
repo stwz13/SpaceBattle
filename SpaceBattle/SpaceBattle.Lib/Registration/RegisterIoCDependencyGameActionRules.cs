@@ -7,6 +7,9 @@ public sealed class RegisterIoCDependencyGameActionRules(GameActionRules rules) 
     public void Execute()
     {
         ArgumentNullException.ThrowIfNull(rules);
+        IoCRegistrar.Register(RegisterIoCDependencyRuleCommand.RuleValuesDependency, _ => rules.Parameters);
+        var objectBindings = new GameObjectRuleBindings();
+        IoCRegistrar.Register(GameObjectRuleBindings.Dependency, _ => objectBindings);
         var configKeys = rules.Actions.Keys.Select(action => action + ".Config").ToHashSet(StringComparer.Ordinal);
         foreach (var step in rules.Actions.Values.SelectMany(steps => steps).Distinct(StringComparer.Ordinal))
             RegisterIoCDependencyRuleCommand.Bind(step);

@@ -2,11 +2,14 @@ using System.Text.Json;
 
 namespace SpaceBattle.Lib;
 
-public sealed class ProjectileSettingsRule : GameClassParameter<ProjectileSettingsRule.Settings>
+public sealed class ProjectileSettingsRule : GameObjectRuleParameter<ProjectileSettingsRule.Settings>
 {
     public sealed record Settings(int Speed, int Damage);
 
-    public ProjectileSettingsRule() : base("Shooting.Projectile", Read, Bind) { }
+    public ProjectileSettingsRule() : base("Shooting.Projectile", string.Empty, Read, [
+        GameObjectRuleProperty<Settings>.For<IShooting, int>(nameof(IShooting.ProjectileSpeed), (settings, _) => settings.Speed),
+        GameObjectRuleProperty<Settings>.For<IShooting, int>(nameof(IShooting.ProjectileDamage), (settings, _) => settings.Damage)
+    ], legacy: true) { }
 
     private static Settings Read(JsonElement value)
     {
@@ -23,15 +26,4 @@ public sealed class ProjectileSettingsRule : GameClassParameter<ProjectileSettin
         throw new ArgumentException($"Shooting.Projectile.{name} must be a nonnegative integer.");
     }
 
-    private static void Bind(Settings settings)
-    {
-        SetProperty(nameof(IShooting.ProjectileSpeed), settings.Speed);
-        SetProperty(nameof(IShooting.ProjectileDamage), settings.Damage);
-    }
-
-    private static void SetProperty(string name, int value)
-    {
-        var property = typeof(IShooting).GetProperty(name)!;
-        IoCRegistrar.Register(GeneratedNames.PropertyDependency(typeof(IShooting), property), _ => value);
-    }
 }
