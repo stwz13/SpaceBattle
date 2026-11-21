@@ -21,7 +21,7 @@ public class GameClassParameter<TSettings> : IGameRuleParameter
     public void Validate(JsonElement value) => _ = Decode(value);
     public void Install(JsonElement value) => _install(Decode(value));
 
-    private TSettings Decode(JsonElement value)
+    internal TSettings Decode(JsonElement value)
     {
         try { return _read(value); }
         catch (Exception error) when (error is JsonException or KeyNotFoundException or InvalidOperationException
