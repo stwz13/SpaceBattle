@@ -13,6 +13,7 @@ public sealed class RegisterIoCDependencyManagedGames : ICommand
         var scope = new GameScope(Ioc.Resolve<object>("IoC.Scope.Current"));
         var server = Ioc.Resolve<IServer>(ServerDependencies.Instance);
         IMessageInterpreter interpreter = new IoCMessageInterpreter();
+        IoCRegistrar.Register(RuntimeServiceDependencies.ActivateGame, _ => (Func<IManagedGameHost, Action>)(_ => () => { }));
         IoCRegistrar.Register(MessagePipelineDependencies.Interpreter, _ => interpreter);
         IoCRegistrar.Register(MessagePipelineDependencies.Decorate, args => args is [Func<IMessageInterpreter, IMessageInterpreter> decorate]
             ? interpreter = decorate(interpreter) : throw new ArgumentException("Expected an interpreter decorator."));
@@ -39,6 +40,8 @@ public sealed class RegisterIoCDependencyManagedGames : ICommand
                         return completion.Task;
                     }, owner => owner.Wake(), hostState);
                 host.TransferControl = new GameHostTransferService(hostState, gate, host.PauseAndSnapshot, host.ResumeBuffered);
+                using (game.Scope.Enter())
+                    host.ActivateGame = Ioc.Resolve<Func<IManagedGameHost, Action>>(RuntimeServiceDependencies.ActivateGame)(host);
                 return host;
             });
         var games = new GameLifecycle(server, registry, lifecycle, create, hostFactory);
