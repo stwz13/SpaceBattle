@@ -9,6 +9,19 @@ public static class HostComposition
     {
         services.TryAddSingleton(_ => configuration.GetSection("Server").Get<ServerOptions>() ?? new ServerOptions());
         services.TryAddSingleton<GameRuleRooms>();
+        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+        services.TryAddSingleton<IProjectileCollisionDetector, SegmentProjectileCollisionDetector>();
+        services.TryAddSingleton<IBattleShipClassifier>(_ => new BattleShipKindClassifier(
+            configuration.GetSection("Server:BattleShipKinds").Get<string[]>() ?? ["Ship", "Tanker"]));
+        services.TryAddSingleton(provider => new DelayedCommandScheduler(provider.GetRequiredService<TimeProvider>(),
+            command => command.Execute(), error => provider.GetRequiredService<ILogger<DelayedCommandScheduler>>()
+                .LogError(error, "Failed to dispatch a battle tick")));
+        services.TryAddSingleton(provider => new BattleSimulationModule(
+            new GameTickFactory(provider.GetRequiredService<DelayedCommandScheduler>()),
+            provider.GetRequiredService<IBattleShipClassifier>(),
+            provider.GetRequiredService<IProjectileCollisionDetector>(),
+            TimeSpan.FromMilliseconds(configuration.GetValue("Server:BattleTickMilliseconds", 100)),
+            error => provider.GetRequiredService<ILogger<BattleSimulationModule>>().LogError(error, "Battle tick failed")));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IGameRuleParameter, ShipSpeedRule>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IGameRuleParameter, ProjectileSettingsRule>());
         services.TryAddSingleton(provider => GameObjectRuleSchema.Load(
@@ -22,7 +35,8 @@ public static class HostComposition
         services.TryAddSingleton(provider => ServerComposition.Create(provider.GetRequiredService<ServerOptions>(),
             configureCommands: () => provider.GetRequiredService<GameRuleRooms>().Bind(
                 GameRuleComposition.Configure(provider.GetServices<RegisterIoCDependencyRuleCommand>(),
-                    provider.GetRequiredService<GameRuleParameterCatalog>(), provider.GetServices<FleetContextOrder>())),
+                    provider.GetRequiredService<GameRuleParameterCatalog>(), provider.GetServices<FleetContextOrder>(),
+                    provider.GetRequiredService<BattleSimulationModule>())),
             log: new ApplicationLog(provider.GetRequiredService<ILogger<ApplicationLog>>())));
         services.TryAddSingleton<IServerApplication>(provider => provider.GetRequiredService<ServerApplication>());
         services.TryAddSingleton<IReadOnlyDictionary<string, IRemoteServer>>(_ => new Dictionary<string, IRemoteServer>());
