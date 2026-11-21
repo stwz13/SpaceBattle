@@ -11,7 +11,13 @@ public static class HostComposition
         services.TryAddSingleton<GameRuleRooms>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IGameRuleParameter, ShipSpeedRule>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IGameRuleParameter, ProjectileSettingsRule>());
-        services.TryAddSingleton<GameRuleParameterCatalog>();
+        services.TryAddSingleton(provider => GameObjectRuleSchema.Load(
+            configuration["GameRules:ObjectSchema"] ?? GameObjectRuleSchema.DefaultPath,
+            provider.GetServices<IGameObjectRuleValue>()));
+        services.TryAddSingleton(provider => new GameRuleParameterCatalog(
+            provider.GetServices<IGameRuleParameter>().Concat(
+                provider.GetServices<RegisterIoCDependencyRuleCommand>().Select(command => command.Parameter).OfType<IGameRuleParameter>()),
+            provider.GetRequiredService<GameObjectRuleSchema>()));
         services.TryAddSingleton<IGameRuleRooms>(provider => provider.GetRequiredService<GameRuleRooms>());
         services.TryAddSingleton(provider => ServerComposition.Create(provider.GetRequiredService<ServerOptions>(),
             configureCommands: () => provider.GetRequiredService<GameRuleRooms>().Bind(
