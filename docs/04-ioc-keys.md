@@ -154,3 +154,11 @@
 Для игровых действий: `CodeGeneration` → `GeneratedStrategies…` → `Macro` → `ActionComposition`/`ContextActionComposition` → `ActionConfigurations(dir)` → `Context.*`-команды. Ключи шагов должны существовать к моменту `Resolve`, а не к моменту регистрации.
 
 ⚠ `RegisterIoCDependencyServer` и `ManagedGames` запоминают **текущий** скоуп на момент `Execute()`: потоки, игры и стоп-команды создаются внутри него.
+
+## L. Длительные операции
+
+| Ключ | Аргументы | Результат | Регистрация |
+|---|---|---|---|
+| `LongOperations.Create` (`LongOperationDependencies.Create`) | `ICommand step, ICommandReceiver receiver` | `LongOperationCommands` с командами `Start` и `Stop` для новой операции | `RegisterIoCDependencyLongOperations` |
+
+Вызовите регистрацию явно в выбранном скоупе перед разрешением ключа. Каждое разрешение создаёт отдельную операцию. Для запуска и остановки используйте команды из одной пары. Передайте приёмник, связанный с очередью этой игры.

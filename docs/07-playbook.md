@@ -129,3 +129,17 @@ git diff --name-status origin/main origin/feature/<имя> -- SpaceBattle
 git merge-base --is-ancestor origin/A origin/B && echo "A ⊂ B"
 git log origin/B --not origin/A --oneline        # есть в B, нет в A
 ```
+
+## 11. Запустить длительную операцию
+
+В примере `game` — игра, а `move` и `checkCollisions` — готовые игровые команды. Соберите один шаг как макрокоманду и создайте пару команд управления.
+
+```csharp
+new RegisterIoCDependencyLongOperations().Execute();
+var step = new MacroCommand([move, checkCollisions]);
+var operation = Ioc.Resolve<LongOperationCommands>(
+    LongOperationDependencies.Create, step, new CommandReceiver(game.Post));
+game.Post(operation.Start);
+```
+
+Сохраните `operation` и при необходимости поставьте `operation.Stop` в ту же очередь. Вызывайте `Game.Post` на её потоке-владельце. При запуске нескольких операций создайте отдельную пару для каждой. Если шаг должен повторяться с заданным интервалом, используйте планирование по времени. Немедленное добавление в хвост даёт порядок FIFO.
