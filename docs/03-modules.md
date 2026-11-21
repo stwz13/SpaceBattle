@@ -91,6 +91,8 @@
 
 **Шаг мира** (ветки `world-update`/`game-ticks`):
 - `WorldStepFactory` создаёт «кадр» — предмет со свойствами `Battle` и `Items` (снимок хранилища) — и вызывает действие `WorldStep` (`Commands.Action`).
+
+В HTTP-партии с двумя флотилиями `BattleWorldStepCommand` использует `IBattleShipClassifier` и `IBattleProgressTracker`. Движение снарядов — отдельная команда. `IProjectileCollisionDetector` ищет ближайшую цель на замкнутом отрезке движения в 2D, не меняя предметы. Штатный детектор сравнивает координаты центра корабля с отрезком. Свои корабли исключаются из кандидатов.
 - Фазы задаются JSON: `{"phases":[{"name":"…","execution":"World"|"Items","action":"…","selector":"…"}]}`. `World` — действие над кадром; `Items` — действие для каждого предмета, прошедшего селектор (`Func<IGameItem,bool>` по ключу `selector`); для `World` селектор указывать нельзя.
 - Загрузка и регистрация: `RegisterIoCDependencyWorldPhaseConfigurationLoader` → `RegisterIoCDependencyConfiguredWorldPhases(path[, action])`. Дубли имён фаз и подмена `Commands.Action`/`Commands.Macro` запрещены (`FormatException`).
 
