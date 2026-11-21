@@ -8,8 +8,15 @@ public static class HostComposition
     public static void Configure(IServiceCollection services, IConfiguration configuration)
     {
         services.TryAddSingleton(_ => configuration.GetSection("Server").Get<ServerOptions>() ?? new ServerOptions());
-        services.TryAddSingleton(provider => ServerComposition.Create(provider.GetRequiredService<ServerOptions>(),
-            log: new ApplicationLog(provider.GetRequiredService<ILogger<ApplicationLog>>())));
+        services.TryAddSingleton(provider =>
+        {
+            var options = provider.GetRequiredService<ServerOptions>();
+            var paths = configuration.GetSection("Server:CommandPlugins").Get<string[]>() ?? [];
+            var plugins = CommandPluginLoader.Load(paths, options);
+            return ServerComposition.Create(options,
+                configureCommands: new RegisterIoCDependencyCommandPlugins(plugins, options.CommandTargets).Execute,
+                log: new ApplicationLog(provider.GetRequiredService<ILogger<ApplicationLog>>()));
+        });
         services.TryAddSingleton<IServerApplication>(provider => provider.GetRequiredService<ServerApplication>());
         services.TryAddSingleton<IReadOnlyDictionary<string, IRemoteServer>>(_ => new Dictionary<string, IRemoteServer>());
         services.TryAddSingleton(provider =>
