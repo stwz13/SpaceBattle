@@ -136,10 +136,14 @@
 | `GameTicks.Step` | – | `ICommand` одного тика мира |
 | `GameTicks.Create` | `ICommandReceiver receiver` | `LongOperationCommands` с командами `Start` и `Stop` |
 | `Tick.Config` | – | Список ключей фаз из `Tick.config` в порядке выполнения |
+| `World.CheckCollisions` | `IReadOnlyCollection<IGameItem> items` | `ICommand` проверки столкновений для текущего тика |
+| `World.Collisions.MovementSegments` | – | Экземпляр `WorldMovementSegments` для текущей игры |
 
 `RegisterIoCDependencyWorldTicks` можно вызвать в скоупе игры или в его родителе. Разрешайте `GameTicks.Step` и `GameTicks.Create` в скоупе игры, где зарегистрирован её `IBattleContext`. Для `GameTicks.Create` зарегистрируйте также `LongOperations.Create` до разрешения ключа.
 
 Перед выполнением тика зарегистрируйте `Commands.Macro`, загрузите каталог с `Tick.config` через `RegisterIoCDependencyActionConfigurations` и подключите ключи перечисленных фаз.
+
+Вызовите `RegisterIoCDependencyWorldCollisions` в скоупе каждой игры, использующей фазу `World.CheckCollisions`. Передайте предикаты цели и источника, ключ `CollisionTree` и имя контекстного действия с ролями `Target` и `Source`.
 
 ## K. Порядок регистрации
 
