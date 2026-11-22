@@ -9,6 +9,7 @@ public partial class Program
         var app = builder.Build();
         ApiEndpoints.Map(app);
         GameRuleEndpoints.Map(app);
+        BattleResultEndpoints.Map(app);
         app.Run();
     }
 }

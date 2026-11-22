@@ -10,6 +10,7 @@ public sealed partial class ManagedGameHost
             _game = replacement.Game;
             _thread = replacement.Thread;
             _runner = replacement.Runner;
+            Activation = replacement is ManagedGameHost managed ? managed.Activation : GameActivation.None;
             TransferControl.CompleteRelocation();
         }
     }

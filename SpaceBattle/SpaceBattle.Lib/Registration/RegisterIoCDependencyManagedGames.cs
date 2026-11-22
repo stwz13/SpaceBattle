@@ -13,6 +13,7 @@ public sealed class RegisterIoCDependencyManagedGames : ICommand
         var scope = new GameScope(Ioc.Resolve<object>("IoC.Scope.Current"));
         var server = Ioc.Resolve<IServer>(ServerDependencies.Instance);
         IMessageInterpreter interpreter = new IoCMessageInterpreter();
+        IoCRegistrar.Register(RuntimeServiceDependencies.ActivateGame, _ => (Func<IManagedGameHost, GameActivation>)(_ => GameActivation.None));
         IoCRegistrar.Register(MessagePipelineDependencies.Interpreter, _ => interpreter);
         IoCRegistrar.Register(MessagePipelineDependencies.Decorate, args => args is [Func<IMessageInterpreter, IMessageInterpreter> decorate]
             ? interpreter = decorate(interpreter) : throw new ArgumentException("Expected an interpreter decorator."));
@@ -25,7 +26,7 @@ public sealed class RegisterIoCDependencyManagedGames : ICommand
         Func<IManagedGame, IServerThread?, IManagedGameHost> hostFactory = (game, target) => ScopeExecution.InScope(scope, () =>
             {
                 var thread = target ?? Ioc.Resolve<IServerThread>(RoutingDependencies.Thread, game.Id);
-                var runner = new GameRunner(game, thread);
+                var runner = new GameRunner(game, thread, () => !game.Paused);
                 var gate = new object();
                 var hostState = new GameHostLifecycle(gate);
                 var host = new ManagedGameHost(game, thread, runner, gate,
@@ -39,6 +40,8 @@ public sealed class RegisterIoCDependencyManagedGames : ICommand
                         return completion.Task;
                     }, owner => owner.Wake(), hostState);
                 host.TransferControl = new GameHostTransferService(hostState, gate, host.PauseAndSnapshot, host.ResumeBuffered);
+                using (game.Scope.Enter())
+                    host.Activation = Ioc.Resolve<Func<IManagedGameHost, GameActivation>>(RuntimeServiceDependencies.ActivateGame)(host);
                 return host;
             });
         var games = new GameLifecycle(server, registry, lifecycle, create, hostFactory);

@@ -33,7 +33,7 @@ internal sealed class FleetOrderActionFactory : IFleetOrderActionFactory
         {
             if (roles.Count != 0)
                 throw new MessageFormatException($"Action '{action}' has no additional roles.");
-            return _single.Create(player, action, _items.Get(actor));
+            return _single.Create(player, action, OperationalActor(actor));
         }
 
         if (roles.Count != schema.OtherRoles.Count || schema.OtherRoles.Any(role => !roles.ContainsKey(role)))
@@ -41,7 +41,7 @@ internal sealed class FleetOrderActionFactory : IFleetOrderActionFactory
 
         var participants = new Dictionary<string, IGameItem>(StringComparer.Ordinal)
         {
-            [schema.ActorRole] = _items.Get(actor)
+            [schema.ActorRole] = OperationalActor(actor)
         };
         foreach (var role in schema.OtherRoles)
         {
@@ -54,5 +54,13 @@ internal sealed class FleetOrderActionFactory : IFleetOrderActionFactory
             () => participants.Values.All(item => _policy.IsAllowed(player, action, item)),
             () => _compose(action, new CommandContext(participants)),
             () => throw new UnauthorizedAccessException("The requested action is not permitted for all participants."));
+    }
+
+    private IGameItem OperationalActor(string id)
+    {
+        var item = _items.Get(id);
+        if (BattleItemProperties.IsDestroyed(item))
+            throw new InvalidOperationException("The ship is out of action.");
+        return item;
     }
 }
