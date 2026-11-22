@@ -7,7 +7,7 @@ namespace SpaceBattle.Tests;
 
 public class HttpApiTests
 {
-    public static void Configure(RuntimeFixture fixture)
+    internal static void Configure(RuntimeFixture fixture)
     {
         GameTransferTests.Configure(fixture);
         AuthenticationTests.Configure(fixture);

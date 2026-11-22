@@ -28,7 +28,7 @@ public sealed class RegisterIoCDependencyBoundedLoadRouting : ICommand
             .Select(game => (game.Id, moves.Placement(game.Id, game.Thread, game.State == GameHostState.Moving)))
             .ToArray());
         var router = new BoundedLoadRouter<IServerThread>(ring, meter, _tolerance, _probes);
-        RegisterIoCDependencyManagedGames.Register(RoutingDependencies.Thread, args =>
+        IoCRegistrar.Register(RoutingDependencies.Thread, args =>
             args.Length == 1 && args[0] is string gameId
                 ? router.Route(gameId)
                 : throw new ArgumentException("Routing requires the identifier of a game."));

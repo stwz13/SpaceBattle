@@ -20,10 +20,13 @@ public sealed class RegisterIoCDependencyPlayerAuthorization(IReadOnlyDictionary
                 throw new ArgumentException("Every command requires a nonempty list of access rules.");
             commandRules[pair.Key] = pair.Value.ToArray();
         }
+        var itemPermissions = new PlayerItemPermissions(players.ToDictionary(pair => pair.Key,
+            pair => (IReadOnlySet<string>)pair.Value.Items.ToHashSet(StringComparer.Ordinal)));
+        IoCRegistrar.Register(AuthenticationDependencies.ItemPermissions, _ => itemPermissions);
         var rules = new PlayerCommandRules(
             new PlayerCommandPermissions(players.ToDictionary(pair => pair.Key, pair => (IReadOnlySet<string>)pair.Value.Commands.ToHashSet(StringComparer.Ordinal))),
             new TargetItemResolver(commandTargets.ToDictionary()),
-            new PlayerItemPermissions(players.ToDictionary(pair => pair.Key, pair => (IReadOnlySet<string>)pair.Value.Items.ToHashSet(StringComparer.Ordinal))),
+            itemPermissions,
             commandRules);
         var owners = new ScopedItemOwners(() => Ioc.Resolve<IBattleContext>(BattleContextDependencies.Context).Storage);
         IoCRegistrar.Register(AuthenticationDependencies.CommandRules, _ => rules);

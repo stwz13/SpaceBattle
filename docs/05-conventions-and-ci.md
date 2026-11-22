@@ -2,7 +2,7 @@
 
 ## 1. Жёсткие ограничения (проверяет `ArchitectureConstraintsTests`, ломают сборку PR)
 
-Тест разбирает исходники `SpaceBattle.Lib/**/*.cs` (без `obj/` и `bin/`).
+Тест запрета циклов разбирает все исходники `SpaceBattle.Lib/**/*.cs` (без `obj/` и `bin/`). Тест прямого доступа к IoC проверяет файлы в перечисленных ниже папках. Отдельную проверку папки `Runtime` удалили в PR #45.
 
 | Тест | Правило | Что делать |
 |---|---|---|
@@ -38,6 +38,7 @@
 - Заглушки — `TestDoubles/`: `TestGameItem`, `RuntimeFixture`, `GameApiFactory`, `ManualTimeProvider`, `FakeHashFunction`, `RecordingExceptionHandler`, `SpyCommandQueue`, `StubServerThread` и др.
 - Конфигурационные файлы берутся из `Path.Combine(AppContext.BaseDirectory, "Config")` либо пишутся во временный каталог.
 - **Не блокируйте задачи в тестах** (`.Wait()`, `.Result`, `Task.WaitAll`): используйте `async Task` и `await task.WaitAsync(timeout)`. Иначе анализатор xUnit1031 выдаёт предупреждения.
+- Общие вспомогательные методы тестовых классов объявляйте с видимостью `internal`. Анализатор xUnit1013 проверяет публичные методы на наличие `[Fact]` или `[Theory]`.
 - **IoC-скоуп привязан к потоку** (`ThreadLocal`). После `await` тест может оказаться на другом потоке и потерять скоуп: делайте обращения к `Ioc` до `await` или внутри `ScopeExecution.InScope`.
 - Цель — покрытие каждого изменения выше 90 %.
 

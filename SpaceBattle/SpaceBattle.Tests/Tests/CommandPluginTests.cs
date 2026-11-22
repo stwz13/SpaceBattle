@@ -100,7 +100,7 @@ public sealed class CommandPluginTests
             if (withPlugin)
             {
                 settings["Server:CommandPlugins:0"] = "TestPlugins/RepairPlugin.dll";
-                settings["Server:AllowedCommands:1"] = "Repair";
+                settings["Server:AllowedCommands:2"] = "Repair";
                 settings["Server:CommandTargets:Repair"] = "shipId";
                 settings["Server:Players:owner:Commands:1"] = "Repair";
             }

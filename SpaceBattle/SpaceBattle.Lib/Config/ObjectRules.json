@@ -1,0 +1,13 @@
+{
+  "speed": {
+    "view": "SpaceBattle.Lib.IMoving",
+    "property": "Velocity",
+    "type": "speed",
+    "min": 0
+  },
+  "turnSteps": {
+    "view": "SpaceBattle.Lib.IRotating",
+    "property": "AngularVelocity",
+    "type": "angleSteps"
+  }
+}

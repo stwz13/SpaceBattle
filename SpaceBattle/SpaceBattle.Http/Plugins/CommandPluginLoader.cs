@@ -20,7 +20,8 @@ internal static class CommandPluginLoader
             {
                 var plugin = (ICommandPlugin)Activator.CreateInstance(type)!;
                 var name = plugin.CommandName;
-                if (string.IsNullOrWhiteSpace(name) || name != name.Trim() || name == ItemDependencies.CreateCommandKey)
+                if (string.IsNullOrWhiteSpace(name) || name != name.Trim()
+                    || name is ItemDependencies.CreateCommandKey or FleetOrderCommand.Name)
                     throw new InvalidOperationException($"Invalid or reserved plugin command name '{name}' in '{fullPath}'.");
                 if (!options.CommandTargets.TryGetValue(name, out var target) || string.IsNullOrWhiteSpace(target))
                     throw new InvalidOperationException($"Configure Server:CommandTargets:{name} before loading '{fullPath}'.");

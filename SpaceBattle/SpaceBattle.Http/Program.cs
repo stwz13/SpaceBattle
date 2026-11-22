@@ -8,6 +8,8 @@ public partial class Program
         HostComposition.Configure(builder.Services, builder.Configuration);
         var app = builder.Build();
         ApiEndpoints.Map(app);
+        GameRuleEndpoints.Map(app);
+        BattleResultEndpoints.Map(app);
         app.Run();
     }
 }

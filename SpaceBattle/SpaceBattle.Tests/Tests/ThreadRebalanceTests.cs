@@ -5,7 +5,7 @@ namespace SpaceBattle.Tests;
 
 public class ThreadRebalanceTests
 {
-    public static void Configure(RuntimeFixture fixture)
+    internal static void Configure(RuntimeFixture fixture)
     {
         GameTransferTests.Configure(fixture);
         using var scope = fixture.Scope.Enter();

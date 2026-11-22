@@ -27,6 +27,8 @@ public class ProjectileFactory : IProjectileFactory
         var projectile = _items.Create(new Dictionary<string, object>
         {
             ["Id"] = Guid.NewGuid().ToString("N"),
+            ["Kind"] = "Projectile",
+            ["Owner"] = string.Empty,
             ["Position"] = new Vector(position.Coordinates),
             ["Direction"] = direction,
             ["Speed"] = speed,
