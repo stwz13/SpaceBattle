@@ -108,6 +108,15 @@
 Ключи: `Authorization.Policy`, `Factories.AuthorizedAction`, `Commands.AuthorizedAction(subject, action, item)`. Субъект должен быть **доверенным** (из проверенного токена); к `Authentication/*` не привязано.
 
 ---
+### Длительные операции
+
+| Компонент | Назначение |
+|---|---|
+| `LongOperationFactory`, `LongOperationCommands` | Фабрика получает шаг и приёмник команд. Результат содержит связанные команды `Start` и `Stop` для одной операции. |
+| `StartCommand`, `StopCommand` | Управляют запуском и останавливают его через общий экземпляр состояния операции. |
+| `ICommandReceiver`, `CommandReceiver`, `SendCommand` | Ставят команду на последующее выполнение. Для игровой очереди приёмник оборачивает `Game.Post`. |
+| `CommandInjectableCommand`, `RepeatOperationCommand`, `EmptyCommand` | Обёртка делегирует выполнение повторяемому шагу. При остановке выполняет пустую команду. |
+
 ## Часть B. Серверный стек
 
 ### 3.10 Игра
