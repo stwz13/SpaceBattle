@@ -41,6 +41,8 @@
 
 Если топлива не хватает, позиция и топливо не меняются (Check падает первым, макрокоманда прерывается). Нехватка любого свойства → `KeyNotFoundException`, предмет не мутируется.
 
+Для длительного движения `RegisterIoCDependencyLongMovement` связывает действие `Movement` с очередью конкретной игры. `Movement.CreateOperation` выдаёт команды запуска и остановки для объекта. Повторное разрешение в той же игре возвращает ту же пару команд. Тесты `LongMovementTests` проверяют повтор, остановку, изменение направления, расход топлива и передачу пройденного участка.
+
 ### 3.3 Вращение
 
 `RotateCommand(IRotating)`: `Direction += AngularVelocity` (по модулю 8). `IRotating{Direction get/set, AngularVelocity get}`. Действие `Rotation` (`Config/Rotation.config`).
