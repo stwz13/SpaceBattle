@@ -58,7 +58,7 @@ PR #38 вошёл в историю `main` через объединение в 
 | Дозаправка | `RefuelCommand` (цель и источник), контекстная команда, `Config/Refuel.config` |
 | Стрельба | `ShootCommand`, `ProjectileFactory`, `Config/Shooting.config` |
 | Столкновения | дерево решений, загрузка таблиц `*.collisions`, `CollisionCommand`, генератор таблиц `tools/collisions` |
-| Тики игры | `GameTicks`, `DelayedCommandScheduler`, `StartGameTicksCommand`, `StopGameTicksCommand` |
+| Тики игры | длительная операция в очереди игры, макрокоманда фаз из Tick.config |
 | Объектная авторизация | `Authorization/*`: дерево областей, наследуемые разрешения, `AuthorizedActionCommand` |
 | Поток | `ServerThread`, очереди, `HardStop`/`SoftStop` (старая реализация, на ней основан серверный стек) |
 
