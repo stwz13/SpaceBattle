@@ -89,6 +89,20 @@ await app.Stop();
 5. Тест `Tests/FooTests.cs`: конструктор поднимает скоуп и регистрирует `InitCommand → Scope.Create/Set → CodeGeneration → GeneratedStrategies(typeof(FooCommand).Assembly, deps) → Macro → ActionComposition → ActionConfigurations(dir)`; вызов — `Commands.Action`, `"Foo"`, `item`. Проверить: успех, повторный `Execute`, отсутствие свойства (`KeyNotFoundException`, предмет не изменён), крайние значения.
 6. Чтобы команда принималась по HTTP: зарегистрировать `Messages.Command.Foo` (создаёт команду из `IMessage`), добавить `Foo` в `AllowedCommands`, `CommandTargets`, права игрока.
 
+### Запустить движение через очередь игры
+
+Подключите стандартное действие `Movement`. Для вычисления скорости по `Speed` и `Direction` зарегистрируйте `RegisterIoCDependencyComputedVelocity` и передайте `MovementDependencies.ComputedVelocity` при регистрации генерируемых стратегий.
+
+```csharp
+// В скоупе игры на потоке-владельце очереди.
+new RegisterIoCDependencyLongOperations().Execute();
+new RegisterIoCDependencyLongMovement(new CommandReceiver(game.Post)).Execute();
+var movement = Ioc.Resolve<LongOperationCommands>(MovementDependencies.CreateOperation, item);
+game.Post(movement.Start);
+```
+
+Один шаг сдвигает предмет на его текущую скорость и списывает топливо. Чтобы остановить движение, поставьте `movement.Stop` в ту же очередь. После остановки для повторного запуска используйте ту же пару команд. Если другой компонент обрабатывает траектории, передайте его метод записи вторым аргументом регистрации длительного движения.
+
 ## 5. Команда над двумя предметами (по образцу дозаправки / урона)
 
 1. Два интерфейса (`IXxxTarget`, `IXxxSource`), команда `XxxCommand(target, source)`.
@@ -205,7 +219,7 @@ HTTP 202 подтверждает постановку в очередь. При
 
 ## 13. Проверить завершение боя
 
-Запустите согласованную партию из двух участников и создайте корабли обеих флотилий. Для стрельбы передайте `FleetOrder` с действием `Shooting`. Тики идут с интервалом `Server:BattleTickMilliseconds` (по умолчанию 100 мс). Серверный `BattleTick.config` задаёт фазы: наблюдение за флотилиями, продвижение снарядов, повторное наблюдение. Список видов кораблей задаётся `Server:BattleShipKinds` (по умолчанию `Ship` и `Tanker`).
+Запустите согласованную партию из двух участников и создайте корабли обеих флотилий. Для стрельбы передайте `FleetOrder` с действием `Shooting`. Обычный `Tick.config` задаёт фазы до коллизий, проверки коллизий и после коллизий. Снаряд летит отдельной длительной операцией в той же FIFO-очереди. Список видов кораблей задаётся `Server:BattleShipKinds` (по умолчанию `Ship` и `Tanker`).
 
 Запрос `GET /games/match/result` с JWT для `match` возвращает состояние партии и победителя. После выбывания всей флотилии `p2` ответ имеет вид:
 
@@ -231,7 +245,7 @@ game.Post(operation.Start);
 
 ## 15. Подключить тики игры
 
-Штатный `Tick.config` включает фазу `World.CheckCollisions`. В примере `collisionTablesDirectory` содержит таблицу `Ship-Torpedo.collisions`, а предикаты `isShip` и `isTorpedo` выбирают участников в ролях `Target` и `Source`.
+Штатный `Tick.config` включает фазу `World.CheckCollisions` и команды до и после неё. При отдельном подключении команды до и после коллизий по умолчанию пусты. В примере `collisionTablesDirectory` содержит таблицу `Ship-Torpedo.collisions`, а предикаты `isShip` и `isTorpedo` выбирают участников в ролях `Target` и `Source`.
 
 ```csharp
 // В скоупе игры с зарегистрированным IBattleContext.

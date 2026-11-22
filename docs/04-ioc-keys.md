@@ -171,12 +171,15 @@
 
 `Auth.ItemPermissions` возвращает `IPlayerItemPermissions`, используемый также в конвейере авторизации сообщений. Для дополнительных ролей `FleetOrder` фабрика проверяет допуск к идентификаторам через этот контракт. Дерево прав проверяется для каждого объекта команды до вызова `Commands.ContextAction`.
 
-`Games.Activate` возвращает фабрику действий запуска и приостановки для хоста партии. В скоупе боя эти действия управляют длительной операцией тика. `Battle.TickPhases` возвращает ключи фаз из серверного `BattleTick.config`. Фазам передаётся снимок `IReadOnlyCollection<IGameItem>`. `Battle.Progress` возвращает функцию чтения текущего результата на потоке игры. Снимок хранит результат вместе с правилами партии.
+`Games.Activate` возвращает фабрику действий запуска и приостановки для хоста партии. `World.BeforeCollisions` и `World.AfterCollisions` получают снимок `IReadOnlyCollection<IGameItem>`. В партии из двух участников они подключают запуск полёта и подсчёт результата. `Battle.Progress` возвращает функцию чтения результата на потоке игры, а `Battle.MovementHistory` хранит записи траекторий для снимка.
 
 ## M. Длительные операции
 
 | Ключ | Аргументы | Результат | Регистрация |
 |---|---|---|---|
 | `LongOperations.Create` (`LongOperationDependencies.Create`) | `ICommand step, ICommandReceiver receiver` | `LongOperationCommands` с командами `Start` и `Stop` для новой операции | `RegisterIoCDependencyLongOperations` |
+| `Movement.CreateOperation` (`MovementDependencies.CreateOperation`) | `IGameItem item` | `LongOperationCommands` для движения объекта | `RegisterIoCDependencyLongMovement` |
 
 Вызовите регистрацию явно в выбранном скоупе перед разрешением ключа. Каждое разрешение создаёт отдельную операцию. Для запуска и остановки используйте команды из одной пары. Передайте приёмник, связанный с очередью этой игры.
+
+Регистрацию `RegisterIoCDependencyLongMovement` выполните один раз в скоупе игры после подключения длительных операций и действия `Movement`. Приёмник задаётся при регистрации. Дополнительный параметр `Action<IGameItem, Vector, Vector>` получает объект, начало и конец успешного шага на потоке игры.

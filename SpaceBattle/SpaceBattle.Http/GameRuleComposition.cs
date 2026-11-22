@@ -26,11 +26,11 @@ internal static class GameRuleComposition
         new RegisterIoCDependencyActionConfigurations(directory).Execute();
         var modules = extensions.ToDictionary(extension => extension.Name, StringComparer.Ordinal);
         foreach (var step in Directory.EnumerateFiles(directory, "*.config")
-            .Where(path => !string.Equals(Path.GetFileName(path), BattleSimulationModule.TickConfigurationFile, StringComparison.Ordinal))
+            .Where(path => !string.Equals(Path.GetFileName(path), "Tick.config", StringComparison.Ordinal))
             .SelectMany(path => (string[])ActionConfigurationStrategy.Create(path)([])).Except(modules.Keys, StringComparer.Ordinal))
             RegisterIoCDependencyRuleCommand.FromExisting(step).Execute();
         foreach (var extension in modules.Values) extension.Execute();
-        simulation.Configure(directory);
+        simulation.Configure();
         return GameRulesComposition.CreateStarter(parameters, fleetOrders.Select(order => order.Action), simulation);
     }
 }

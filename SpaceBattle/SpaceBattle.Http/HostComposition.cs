@@ -9,16 +9,10 @@ public static class HostComposition
     {
         services.TryAddSingleton(_ => configuration.GetSection("Server").Get<ServerOptions>() ?? new ServerOptions());
         services.TryAddSingleton<GameRuleRooms>();
-        services.TryAddSingleton<TimeProvider>(TimeProvider.System);
         services.TryAddSingleton<IProjectileCollisionDetector, SegmentProjectileCollisionDetector>();
         services.TryAddSingleton<IBattleShipClassifier>(_ => new BattleShipKindClassifier(
             configuration.GetSection("Server:BattleShipKinds").Get<string[]>() ?? ["Ship", "Tanker"]));
-        services.TryAddSingleton(provider => new BattleSimulationModule(
-            provider.GetRequiredService<TimeProvider>(),
-            provider.GetRequiredService<IBattleShipClassifier>(),
-            provider.GetRequiredService<IProjectileCollisionDetector>(),
-            TimeSpan.FromMilliseconds(configuration.GetValue("Server:BattleTickMilliseconds", 100)),
-            error => provider.GetRequiredService<ILogger<BattleSimulationModule>>().LogError(error, "Battle tick failed")));
+        services.TryAddSingleton<BattleSimulationModule>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IGameRuleParameter, ShipSpeedRule>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IGameRuleParameter, ProjectileSettingsRule>());
         services.TryAddSingleton(provider => GameObjectRuleSchema.Load(

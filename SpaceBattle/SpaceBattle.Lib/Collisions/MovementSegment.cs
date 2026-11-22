@@ -1,6 +1,6 @@
 namespace SpaceBattle.Lib;
 
-internal readonly record struct MovementSegment
+public readonly record struct MovementSegment
 {
     public MovementSegment(Vector start, Vector end)
     {

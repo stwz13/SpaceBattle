@@ -16,6 +16,8 @@ public sealed class RegisterIoCDependencyWorldTicks : ICommand
 
     public void Execute()
     {
+        IoCRegistrar.Register(WorldCollisionDependencies.Before, _ => new EmptyCommand());
+        IoCRegistrar.Register(WorldCollisionDependencies.After, _ => new EmptyCommand());
         IoCRegistrar.Register(GameTickDependencies.Step, args => args.Length == 0
             ? new WorldTickCommand(Ioc.Resolve<IBattleContext>(BattleContextDependencies.Context).Storage,
                 items => ActionCompositionStrategy.Compose(_phases(), items))

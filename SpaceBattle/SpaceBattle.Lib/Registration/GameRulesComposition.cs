@@ -23,13 +23,13 @@ public static class GameRulesComposition
 
     internal static void Install(GameActionRules rules, GameRuleParameterCatalog catalog,
         IReadOnlyList<string>? participants, IReadOnlyCollection<string> contextOrders, BattleSimulationModule? simulation,
-        BattleProgress? restored = null)
+        BattleProgress? restored = null, IReadOnlyList<SavedMovement>? movements = null)
     {
         new RegisterIoCDependencyGameActionRules(rules).Execute();
         catalog.Install(rules.Parameters);
         if (participants is not null)
             new RegisterIoCDependencyFleetAccess(participants, rules.Actions.Keys.Concat(contextOrders).ToArray()).Execute();
-        var progress = participants is { Count: 2 } ? simulation?.Install(participants, restored) : null;
+        var progress = participants is { Count: 2 } ? simulation?.Install(participants, restored, movements ?? []) : null;
         GameActionRulesSnapshot.Enable(rules, participants, progress);
     }
 }

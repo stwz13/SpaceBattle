@@ -2,26 +2,50 @@ namespace SpaceBattle.Lib;
 
 public sealed class SegmentProjectileCollisionDetector : IProjectileCollisionDetector
 {
-    public IGameItem? FirstHit(Vector start, Vector end, IEnumerable<IGameItem> targets)
+    public IGameItem? FirstHit(MovementSegment projectile, IEnumerable<(IGameItem Item, MovementSegment Path)> targets)
     {
-        ArgumentNullException.ThrowIfNull(start);
-        ArgumentNullException.ThrowIfNull(end);
         ArgumentNullException.ThrowIfNull(targets);
-        if (start.Dim != 2 || end.Dim != 2)
-            throw new ArgumentException("The collision detector expects a two-dimensional segment.");
-        var dx = (Int128)end.Coordinates[0] - start.Coordinates[0];
-        var dy = (Int128)end.Coordinates[1] - start.Coordinates[1];
-        var length = dx * dx + dy * dy;
-        return targets.Select(item => (Item: item, Position: BattleItemProperties.Read<Vector>(item, "Position")))
-            .Where(entry => entry.Position?.Dim == 2)
-            .Select(entry =>
-            {
-                var x = (Int128)entry.Position!.Coordinates[0] - start.Coordinates[0];
-                var y = (Int128)entry.Position.Coordinates[1] - start.Coordinates[1];
-                var along = x * dx + y * dy;
-                var hit = length == 0 ? x == 0 && y == 0 : x * dy == y * dx && along >= 0 && along <= length;
-                return (entry.Item, Along: along, Hit: hit);
-            })
-            .Where(entry => entry.Hit).OrderBy(entry => entry.Along).Select(entry => entry.Item).FirstOrDefault();
+        IGameItem? first = null;
+        long firstNumerator = 1;
+        long firstDenominator = 1;
+        foreach (var (item, path) in targets)
+        {
+            if (!Contact(projectile, path, out var numerator, out var denominator))
+                continue;
+
+            if (first is not null && (Int128)numerator * firstDenominator >= (Int128)firstNumerator * denominator)
+                continue;
+
+            first = item;
+            firstNumerator = numerator;
+            firstDenominator = denominator;
+        }
+
+        return first;
+    }
+
+    private static bool Contact(MovementSegment projectile, MovementSegment target,
+        out long numerator, out long denominator)
+    {
+        var x = (long)target.StartX - projectile.StartX;
+        var y = (long)target.StartY - projectile.StartY;
+        var dx = projectile.DeltaX - target.DeltaX;
+        var dy = projectile.DeltaY - target.DeltaY;
+        if (dx == 0 && dy == 0)
+        {
+            numerator = 0;
+            denominator = 1;
+            return x == 0 && y == 0;
+        }
+
+        numerator = dx != 0 ? x : y;
+        denominator = dx != 0 ? dx : dy;
+        if (denominator < 0)
+        {
+            numerator = -numerator;
+            denominator = -denominator;
+        }
+
+        return numerator >= 0 && numerator <= denominator && (Int128)x * dy == (Int128)y * dx;
     }
 }

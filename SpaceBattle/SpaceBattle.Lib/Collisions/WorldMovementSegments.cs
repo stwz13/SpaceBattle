@@ -15,6 +15,8 @@ public sealed class WorldMovementSegments
         }
     }
 
+    internal IReadOnlyDictionary<IGameItem, MovementSegment> Pending => _pending;
+
     internal IReadOnlyDictionary<IGameItem, MovementSegment> Take()
     {
         var segments = _pending;

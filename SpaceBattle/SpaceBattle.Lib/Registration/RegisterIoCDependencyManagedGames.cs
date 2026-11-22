@@ -26,7 +26,7 @@ public sealed class RegisterIoCDependencyManagedGames : ICommand
         Func<IManagedGame, IServerThread?, IManagedGameHost> hostFactory = (game, target) => ScopeExecution.InScope(scope, () =>
             {
                 var thread = target ?? Ioc.Resolve<IServerThread>(RoutingDependencies.Thread, game.Id);
-                var runner = new GameRunner(game, thread);
+                var runner = new GameRunner(game, thread, () => !game.Paused);
                 var gate = new object();
                 var hostState = new GameHostLifecycle(gate);
                 var host = new ManagedGameHost(game, thread, runner, gate,

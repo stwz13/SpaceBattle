@@ -14,21 +14,36 @@ public sealed class SegmentProjectileCollisionTests
     }
 
     [Fact]
-    public void Detector_Chooses_The_First_Target_On_An_Entire_Segment()
+    public void Detector_Chooses_The_Earliest_Contact_Using_Both_Paths()
     {
         IProjectileCollisionDetector detector = new SegmentProjectileCollisionDetector();
-        var nearer = Item(2, 2);
-        var farther = Item(4, 4);
-        var missed = Item(1, 2);
-        var origin = new Vector(0, 0);
-        Assert.Same(nearer, detector.FirstHit(origin, new Vector(5, 5),
-            [farther, missed, nearer, new GameItem(new Dictionary<string, object>())]));
-        Assert.Null(detector.FirstHit(origin, origin, [nearer, farther]));
-        Assert.Same(nearer, detector.FirstHit(new Vector(2, 2), new Vector(2, 2), [nearer]));
-        Assert.Throws<ArgumentException>(() => detector.FirstHit(origin, new Vector(1), []));
-        Assert.Equal(new Vector(2, 2), nearer.GetProperty("Position"));
+        var earlier = Item();
+        var later = Item();
+        var differentTime = Item();
+        var missed = Item();
+
+        Assert.Same(earlier, detector.FirstHit(Path(0, 0, 10, 0), [
+            (later, Path(7, 0, 7, 0)),
+            (differentTime, Path(3, 5, 3, 0)),
+            (missed, Path(2, 1, 2, 1)),
+            (earlier, Path(8, 0, 0, 0))
+        ]));
+        Assert.Null(detector.FirstHit(Path(0, 0, 10, 0), [(differentTime, Path(3, 5, 3, 0))]));
     }
 
-    private static GameItem Item(int x, int y) =>
-        new(new Dictionary<string, object> { ["Position"] = new Vector(x, y) });
+    [Fact]
+    public void Detector_Handles_Vertical_Reversed_And_Stationary_Paths()
+    {
+        IProjectileCollisionDetector detector = new SegmentProjectileCollisionDetector();
+        var target = Item();
+        Assert.Same(target, detector.FirstHit(Path(0, 10, 0, 0), [(target, Path(0, 2, 0, 2))]));
+        Assert.Null(detector.FirstHit(Path(0, 0, 0, 0), [(target, Path(0, 2, 0, 2))]));
+        Assert.Same(target, detector.FirstHit(Path(0, 0, 0, 0), [(target, Path(0, 0, 0, 0))]));
+        Assert.Same(target, detector.FirstHit(Path(0, 0, 10, 0), [(target, Path(10, 0, 10, 0))]));
+    }
+
+    private static MovementSegment Path(int startX, int startY, int endX, int endY) =>
+        new(new Vector(startX, startY), new Vector(endX, endY));
+
+    private static GameItem Item() => new(new Dictionary<string, object>());
 }
