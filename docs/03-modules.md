@@ -81,18 +81,10 @@
 
 | Класс | Роль |
 |---|---|
-| `GameTicks : IGameTicks` | вызывает шаг мира с периодом `Step`; `Start()`, `Stop()`, `TickNumber`, `IsRunning`, `Failure` |
-| `DelayedCommandScheduler : IDelayedCommandScheduler` | планирует команду через заданное время |
-| `DeliverGameTickCommand`, `TickCommand` | доставка тика на поток игры |
-| `StartGameTicksCommand`, `StopGameTicksCommand` | команды запуска и остановки тиков |
-| `GameTickFactory` | создание `GameTicks`: `GameTicks.Create(step, worldStep, post[, maxCatchUp])` |
+| `WorldTickCommand` | Получает свежий список объектов и выполняет макрокоманду, собранную по `Tick.config`. |
+| `RegisterIoCDependencyWorldTicks` | Подключает команду одного тика и длительную операцию для её повтора. |
 
-Если тик запоздал, выполняется до `maxCatchUpTicks` пропущенных (по умолчанию 2). Проверка аргументов: `step > 0`, `maxCatchUpTicks ≥ 0`.
-
-**Шаг мира** (ветки `world-update`/`game-ticks`):
-- `WorldStepFactory` создаёт «кадр» — предмет со свойствами `Battle` и `Items` (снимок хранилища) — и вызывает действие `WorldStep` (`Commands.Action`).
-- Фазы задаются JSON: `{"phases":[{"name":"…","execution":"World"|"Items","action":"…","selector":"…"}]}`. `World` — действие над кадром; `Items` — действие для каждого предмета, прошедшего селектор (`Func<IGameItem,bool>` по ключу `selector`); для `World` селектор указывать нельзя.
-- Загрузка и регистрация: `RegisterIoCDependencyWorldPhaseConfigurationLoader` → `RegisterIoCDependencyConfiguredWorldPhases(path[, action])`. Дубли имён фаз и подмена `Commands.Action`/`Commands.Macro` запрещены (`FormatException`).
+Исключение фазы передаётся исполнителю команд и завершает текущий запуск тиков.
 
 ### 3.9 Объектная авторизация (`Authorization/*`)
 

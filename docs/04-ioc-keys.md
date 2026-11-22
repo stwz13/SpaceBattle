@@ -133,13 +133,13 @@
 
 | Ключ | Аргументы | Результат |
 |---|---|---|
-| `Factories.GameTicks` | – | `IGameTickFactory` |
-| `GameTicks.Create` | `TimeSpan step, ICommand worldStep, Action<ICommand> post[, int maxCatchUp]` | `IGameTicks` |
-| `Commands.GameTicks.Start`, `Commands.GameTicks.Stop` | `IGameTickControl` | `Lib.ICommand` |
-| `Factories.WorldStep`, `Commands.WorldStep` | – | фабрика и команда шага мира |
-| `WorldStep.Frame` | – | предмет-кадр (`Battle`, `Items`) |
-| `WorldStep.Phases.<длина>.<action>.<имя>` | – | команда фазы |
-| `Configuration.WorldPhases.Loader` | – | `IWorldPhaseConfigurationLoader` |
+| `GameTicks.Step` | – | `ICommand` одного тика мира |
+| `GameTicks.Create` | `ICommandReceiver receiver` | `LongOperationCommands` с командами `Start` и `Stop` |
+| `Tick.Config` | – | Список ключей фаз из `Tick.config` в порядке выполнения |
+
+`RegisterIoCDependencyWorldTicks` можно вызвать в скоупе игры или в его родителе. Разрешайте `GameTicks.Step` и `GameTicks.Create` в скоупе игры, где зарегистрирован её `IBattleContext`. Для `GameTicks.Create` зарегистрируйте также `LongOperations.Create` до разрешения ключа.
+
+Перед выполнением тика зарегистрируйте `Commands.Macro`, загрузите каталог с `Tick.config` через `RegisterIoCDependencyActionConfigurations` и подключите ключи перечисленных фаз.
 
 ## K. Порядок регистрации
 

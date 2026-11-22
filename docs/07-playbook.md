@@ -143,3 +143,19 @@ game.Post(operation.Start);
 ```
 
 Сохраните `operation` и при необходимости поставьте `operation.Stop` в ту же очередь. Вызывайте `Game.Post` на её потоке-владельце. При запуске нескольких операций создайте отдельную пару для каждой. Если шаг должен повторяться с заданным интервалом, используйте планирование по времени. Немедленное добавление в хвост даёт порядок FIFO.
+
+## 12. Подключить тики игры
+
+```csharp
+// В скоупе игры с зарегистрированным IBattleContext.
+new RegisterIoCDependencyMacroCommand().Execute();
+new RegisterIoCDependencyActionConfigurations(Path.Combine(AppContext.BaseDirectory, "Config")).Execute();
+new RegisterIoCDependencyLongOperations().Execute();
+new RegisterIoCDependencyWorldTicks().Execute();
+var ticks = Ioc.Resolve<LongOperationCommands>(GameTickDependencies.Create, new CommandReceiver(game.Post));
+game.Post(ticks.Start);
+```
+
+Порядок фаз задаёт файл `Tick.config` в зарегистрированном каталоге. Чтобы переставить или исключить фазу, измените список ключей. Чтобы добавить фазу, зарегистрируйте ключ, принимающий `IReadOnlyCollection<IGameItem>` и возвращающий `ICommand`, затем впишите его в конфиг. Конфиг читается при выполнении каждого тика. Пустой список фаз даёт пустой шаг, а длительная операция продолжает ставить тики до остановки.
+
+Для остановки поставьте `ticks.Stop` в ту же очередь. Для одного шага разрешите `Ioc.Resolve<ICommand>(GameTickDependencies.Step)` и поставьте полученную команду отдельно. Игра выполняет команды на потоке-владельце своего скоупа и очереди.
