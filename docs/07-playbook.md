@@ -89,6 +89,20 @@ await app.Stop();
 5. Тест `Tests/FooTests.cs`: конструктор поднимает скоуп и регистрирует `InitCommand → Scope.Create/Set → CodeGeneration → GeneratedStrategies(typeof(FooCommand).Assembly, deps) → Macro → ActionComposition → ActionConfigurations(dir)`; вызов — `Commands.Action`, `"Foo"`, `item`. Проверить: успех, повторный `Execute`, отсутствие свойства (`KeyNotFoundException`, предмет не изменён), крайние значения.
 6. Чтобы команда принималась по HTTP: зарегистрировать `Messages.Command.Foo` (создаёт команду из `IMessage`), добавить `Foo` в `AllowedCommands`, `CommandTargets`, права игрока.
 
+### Запустить движение через очередь игры
+
+Подключите стандартное действие `Movement`. Для вычисления скорости по `Speed` и `Direction` зарегистрируйте `RegisterIoCDependencyComputedVelocity` и передайте `MovementDependencies.ComputedVelocity` при регистрации генерируемых стратегий.
+
+```csharp
+// В скоупе игры на потоке-владельце очереди.
+new RegisterIoCDependencyLongOperations().Execute();
+new RegisterIoCDependencyLongMovement(new CommandReceiver(game.Post)).Execute();
+var movement = Ioc.Resolve<LongOperationCommands>(MovementDependencies.CreateOperation, item);
+game.Post(movement.Start);
+```
+
+Один шаг сдвигает предмет на его текущую скорость и списывает топливо. Чтобы остановить движение, поставьте `movement.Stop` в ту же очередь. После остановки для повторного запуска используйте ту же пару команд. Если другой компонент обрабатывает траектории, передайте его метод записи вторым аргументом регистрации длительного движения.
+
 ## 5. Команда над двумя предметами (по образцу дозаправки / урона)
 
 1. Два интерфейса (`IXxxTarget`, `IXxxSource`), команда `XxxCommand(target, source)`.

@@ -166,3 +166,11 @@
 | `LongOperations.Create` (`LongOperationDependencies.Create`) | `ICommand step, ICommandReceiver receiver` | `LongOperationCommands` с командами `Start` и `Stop` для новой операции | `RegisterIoCDependencyLongOperations` |
 
 Вызовите регистрацию явно в выбранном скоупе перед разрешением ключа. Каждое разрешение создаёт отдельную операцию. Для запуска и остановки используйте команды из одной пары. Передайте приёмник, связанный с очередью этой игры.
+
+### Длительное движение
+
+| Ключ | Аргументы | Результат | Регистрация |
+|---|---|---|---|
+| `Movement.CreateOperation` (`MovementDependencies.CreateOperation`) | `IGameItem item` | `LongOperationCommands` для движения объекта | `RegisterIoCDependencyLongMovement` |
+
+Регистрацию `RegisterIoCDependencyLongMovement` выполните один раз в скоупе игры после подключения длительных операций и действия `Movement`. Приёмник задаётся при регистрации. Дополнительный параметр `Action<IGameItem, Vector, Vector>` получает объект, начало и конец успешного шага на потоке игры.
