@@ -35,6 +35,7 @@ public class RegisterIoCDependencyGameSnapshot : ICommand
             }
             var snapshot = JsonNode.Parse(json)!.AsObject();
             var game = Ioc.Resolve<IGame>(GameDependencies.Create, snapshot["gameId"]!.GetValue<string>());
+            GameSnapshotExtensions.Restore(game, snapshot);
             game.Post(new RestoreItemsCommand(snapshot["items"]!.AsArray(), Storage, items,
                 Ioc.Resolve<IGameItemFactory>(GameItemFactoryDependencies.Factory)));
             snapshot["commands"]!.AsArray().Select(node => node!.AsObject()).ToList()

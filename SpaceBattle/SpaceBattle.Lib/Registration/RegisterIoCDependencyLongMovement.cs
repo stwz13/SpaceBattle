@@ -6,13 +6,20 @@ namespace SpaceBattle.Lib;
 public sealed class RegisterIoCDependencyLongMovement : ICommand
 {
     private readonly ICommandReceiver _receiver;
+    private readonly Func<IGameItem, ICommand> _createStep;
     private readonly Action<IGameItem, Vector, Vector>? _observe;
 
     public RegisterIoCDependencyLongMovement(
         ICommandReceiver receiver, Action<IGameItem, Vector, Vector>? observe = null)
+        : this(receiver, ConfiguredMovement, observe) { }
+
+    internal RegisterIoCDependencyLongMovement(ICommandReceiver receiver,
+        Func<IGameItem, ICommand> createStep, Action<IGameItem, Vector, Vector>? observe)
     {
         ArgumentNullException.ThrowIfNull(receiver);
+        ArgumentNullException.ThrowIfNull(createStep);
         _receiver = receiver;
+        _createStep = createStep;
         _observe = observe;
     }
 
@@ -24,9 +31,12 @@ public sealed class RegisterIoCDependencyLongMovement : ICommand
             : throw new ArgumentException("A movement operation requires a game item."));
     }
 
+    internal static ICommand ConfiguredMovement(IGameItem item) =>
+        new CallbackCommand(() => Ioc.Resolve<ICommand>("Commands.Action", "Movement", item).Execute());
+
     private LongOperationCommands Create(IGameItem item)
     {
-        ICommand step = new CallbackCommand(() => Ioc.Resolve<ICommand>("Commands.Action", "Movement", item).Execute());
+        var step = _createStep(item);
         if (_observe is { } observe)
         {
             step = new ObserveMovementStepCommand(step,

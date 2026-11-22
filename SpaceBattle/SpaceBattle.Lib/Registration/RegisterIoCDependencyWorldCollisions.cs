@@ -23,24 +23,15 @@ public sealed class RegisterIoCDependencyWorldCollisions : ICommand
         _consequenceAction = consequenceAction;
     }
 
-    public void Execute()
-    {
-        var segments = new WorldMovementSegments();
-        IoCRegistrar.Register(WorldCollisionDependencies.MovementSegments, args => args.Length == 0
-            ? segments
-            : throw new ArgumentException("World movement segments take no arguments."));
-        IoCRegistrar.Register(WorldCollisionDependencies.Check, args =>
-        {
-            if (args is not [IReadOnlyCollection<IGameItem> items])
-            {
-                throw new ArgumentException("A world collision check requires a snapshot of game items.");
-            }
+    public void Execute() =>
+        new RegisterIoCDependencyWorldCollisionRules([CreateRule]).Execute();
 
-            var tree = Ioc.Resolve<CollisionTree>(_treeKey);
-            return new CheckWorldCollisionsCommand(items, segments.Take, _isTarget, _isSource,
-                (target, source, offset) => new CollisionCommand(tree, offset,
-                    new CallbackCommand(() => ExecuteConsequence(target, source))));
-        });
+    private ICommand CreateRule(WorldCollisionFrame frame)
+    {
+        var tree = Ioc.Resolve<CollisionTree>(_treeKey);
+        return new CheckWorldCollisionsCommand(frame, _isTarget, _isSource,
+            (target, source, offset) => new CollisionCommand(tree, offset,
+                new CallbackCommand(() => ExecuteConsequence(target, source))));
     }
 
     private void ExecuteConsequence(IGameItem target, IGameItem source)

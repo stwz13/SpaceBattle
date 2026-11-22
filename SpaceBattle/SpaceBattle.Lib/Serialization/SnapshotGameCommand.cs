@@ -29,6 +29,7 @@ public class SnapshotGameCommand : ICommand
     {
         ["gameId"] = _game.Id,
         ["items"] = new JsonArray(_storage().GetSnapshot().Select(item => (JsonNode?)_items.Write(item)).ToArray()),
-        ["commands"] = new JsonArray(_game.Pending.Select(command => (JsonNode?)_commands.Write(command)).ToArray()),
+        ["commands"] = new JsonArray(_game.Pending.Where(command => command is not TransientGameCommand)
+            .Select(command => (JsonNode?)_commands.Write(command)).ToArray()),
     }.ToJsonString());
 }

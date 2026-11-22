@@ -155,6 +155,28 @@ public sealed class WorldCollisionTests
             Ioc.Resolve<WorldMovementSegments>(WorldCollisionDependencies.MovementSegments, "unexpected"));
     }
 
+    [Fact]
+    public void Collision_Rules_Share_One_Frame_And_Consume_It_Once()
+    {
+        using var scope = _scope.Enter();
+        var frames = new List<WorldCollisionFrame>();
+        var item = AddItem("item", "source", 8, 0);
+        new RegisterIoCDependencyWorldCollisionRules([
+            frame => new DelegateStep(() => frames.Add(frame)),
+            frame => new DelegateStep(() => frames.Add(frame))
+        ]).Execute();
+        Segments().Record(item, new Vector(0, 0), new Vector(8, 0));
+        var phase = Ioc.Resolve<LibCommand>(WorldCollisionDependencies.Check, _storage.GetSnapshot());
+
+        phase.Execute();
+        phase.Execute();
+
+        Assert.Same(frames[0], frames[1]);
+        Assert.Equal(8, frames[0].PathFor(item).DeltaX);
+        Assert.Same(frames[2], frames[3]);
+        Assert.Equal(0, frames[2].PathFor(item).DeltaX);
+    }
+
     private void Configure(params int[][] vectors)
     {
         new RegisterIoCDependencyBattleContext(new BattleContext("battle", _storage)).Execute();
