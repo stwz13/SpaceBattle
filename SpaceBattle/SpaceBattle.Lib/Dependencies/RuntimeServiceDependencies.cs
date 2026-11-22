@@ -2,6 +2,7 @@ namespace SpaceBattle.Lib;
 
 public static class RuntimeServiceDependencies
 {
+    internal const string ActivateGame = "Games.Activate";
     public const string Registry = "Server.GameRegistry";
     public const string Lifecycle = "Server.LifecycleGate";
     public const string Restore = "Server.RestoreGame";

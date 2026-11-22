@@ -133,13 +133,17 @@
 
 | Ключ | Аргументы | Результат |
 |---|---|---|
-| `Factories.GameTicks` | – | `IGameTickFactory` |
-| `GameTicks.Create` | `TimeSpan step, ICommand worldStep, Action<ICommand> post[, int maxCatchUp]` | `IGameTicks` |
-| `Commands.GameTicks.Start`, `Commands.GameTicks.Stop` | `IGameTickControl` | `Lib.ICommand` |
-| `Factories.WorldStep`, `Commands.WorldStep` | – | фабрика и команда шага мира |
-| `WorldStep.Frame` | – | предмет-кадр (`Battle`, `Items`) |
-| `WorldStep.Phases.<длина>.<action>.<имя>` | – | команда фазы |
-| `Configuration.WorldPhases.Loader` | – | `IWorldPhaseConfigurationLoader` |
+| `GameTicks.Step` | – | `ICommand` одного тика мира |
+| `GameTicks.Create` | `ICommandReceiver receiver` | `LongOperationCommands` с командами `Start` и `Stop` |
+| `Tick.Config` | – | Список ключей фаз из `Tick.config` в порядке выполнения |
+| `World.CheckCollisions` | `IReadOnlyCollection<IGameItem> items` | `ICommand` проверки столкновений для текущего тика |
+| `World.Collisions.MovementSegments` | – | Экземпляр `WorldMovementSegments` для текущей игры |
+
+`RegisterIoCDependencyWorldTicks` можно вызвать в скоупе игры или в его родителе. Разрешайте `GameTicks.Step` и `GameTicks.Create` в скоупе игры, где зарегистрирован её `IBattleContext`. Для `GameTicks.Create` зарегистрируйте также `LongOperations.Create` до разрешения ключа.
+
+Перед выполнением тика зарегистрируйте `Commands.Macro`, загрузите каталог с `Tick.config` через `RegisterIoCDependencyActionConfigurations` и подключите ключи перечисленных фаз.
+
+Вызовите `RegisterIoCDependencyWorldCollisions` в скоупе каждой игры, использующей фазу `World.CheckCollisions`. Передайте предикаты цели и источника, ключ `CollisionTree` и имя контекстного действия с ролями `Target` и `Source`.
 
 ## K. Порядок регистрации
 
@@ -162,3 +166,20 @@
 При старте партии её `<Action>.Config` возвращает упорядоченный массив ключей `GameRules.Steps.<имя>.Create`. Каждый такой ключ обращается к фабрике в текущем скоупе при сборке действия. Фабрику можно добавить после согласования. Согласованные определения записываются в `extensions.actionRules` снимка и восстанавливаются через `Serialization.RestoreExtension.actionRules` до загрузки очереди команд.
 
 В скоупе игры `GameRules.ParameterValues` возвращает согласованные JSON-значения. Настраиваемая фабрика читает `commands.<имя шага>` и передаёт в команду типизированные настройки. `GameRules.ObjectBindings` хранит привязки свойств адаптеров, построенные по серверной схеме. Чтение свойства выбирает стратегию по `Kind` предмета. При отсутствии привязки применяется исходная стратегия.
+
+`Messages.Command.FleetOrder` принимает `IAuthenticatedMessage` и создаёт отложенное действие. В скоупе согласованной партии `Factories.AuthorizedAction` использует её дерево прав. В хосте для игр без состава лобби действует политика отказа.
+
+`Auth.ItemPermissions` возвращает `IPlayerItemPermissions`, используемый также в конвейере авторизации сообщений. Для дополнительных ролей `FleetOrder` фабрика проверяет допуск к идентификаторам через этот контракт. Дерево прав проверяется для каждого объекта команды до вызова `Commands.ContextAction`.
+
+`Games.Activate` возвращает фабрику действий запуска и приостановки для хоста партии. `World.BeforeCollisions` и `World.AfterCollisions` получают снимок `IReadOnlyCollection<IGameItem>`. В партии из двух участников они подключают запуск полёта и подсчёт результата. `Battle.Progress` возвращает функцию чтения результата на потоке игры, а `Battle.MovementHistory` хранит записи траекторий для снимка.
+
+## M. Длительные операции
+
+| Ключ | Аргументы | Результат | Регистрация |
+|---|---|---|---|
+| `LongOperations.Create` (`LongOperationDependencies.Create`) | `ICommand step, ICommandReceiver receiver` | `LongOperationCommands` с командами `Start` и `Stop` для новой операции | `RegisterIoCDependencyLongOperations` |
+| `Movement.CreateOperation` (`MovementDependencies.CreateOperation`) | `IGameItem item` | `LongOperationCommands` для движения объекта | `RegisterIoCDependencyLongMovement` |
+
+Вызовите регистрацию явно в выбранном скоупе перед разрешением ключа. Каждое разрешение создаёт отдельную операцию. Для запуска и остановки используйте команды из одной пары. Передайте приёмник, связанный с очередью этой игры.
+
+Регистрацию `RegisterIoCDependencyLongMovement` выполните один раз в скоупе игры после подключения длительных операций и действия `Movement`. Приёмник задаётся при регистрации. Дополнительный параметр `Action<IGameItem, Vector, Vector>` получает объект, начало и конец успешного шага на потоке игры.

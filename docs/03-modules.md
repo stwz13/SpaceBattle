@@ -41,6 +41,8 @@
 
 Если топлива не хватает, позиция и топливо не меняются (Check падает первым, макрокоманда прерывается). Нехватка любого свойства → `KeyNotFoundException`, предмет не мутируется.
 
+Для длительного движения `RegisterIoCDependencyLongMovement` связывает действие `Movement` с очередью конкретной игры. `Movement.CreateOperation` выдаёт команды запуска и остановки для объекта. Повторное разрешение в той же игре возвращает ту же пару команд. Тесты `LongMovementTests` проверяют повтор, остановку, изменение направления, расход топлива и передачу пройденного участка.
+
 ### 3.3 Вращение
 
 `RotateCommand(IRotating)`: `Direction += AngularVelocity` (по модулю 8). `IRotating{Direction get/set, AngularVelocity get}`. Действие `Rotation` (`Config/Rotation.config`).
@@ -81,18 +83,18 @@
 
 | Класс | Роль |
 |---|---|
-| `GameTicks : IGameTicks` | вызывает шаг мира с периодом `Step`; `Start()`, `Stop()`, `TickNumber`, `IsRunning`, `Failure` |
-| `DelayedCommandScheduler : IDelayedCommandScheduler` | планирует команду через заданное время |
-| `DeliverGameTickCommand`, `TickCommand` | доставка тика на поток игры |
-| `StartGameTicksCommand`, `StopGameTicksCommand` | команды запуска и остановки тиков |
-| `GameTickFactory` | создание `GameTicks`: `GameTicks.Create(step, worldStep, post[, maxCatchUp])` |
+| `WorldTickCommand` | Получает свежий список объектов и выполняет макрокоманду, собранную по `Tick.config`. |
+| `RegisterIoCDependencyWorldTicks` | Подключает команду одного тика и длительную операцию для её повтора. |
 
-Если тик запоздал, выполняется до `maxCatchUpTicks` пропущенных (по умолчанию 2). Проверка аргументов: `step > 0`, `maxCatchUpTicks ≥ 0`.
+| `WorldMovementSegments` | Хранит фактические начальные и конечные позиции для одного интервала тика в скоупе игры. |
+| `CheckWorldCollisionsCommand` | Выбирает активные цели и источники из снимка объектов. Для каждой пары вызывает существующий `CollisionCommand` с относительным вектором пройденного участка. |
+| `RegisterIoCDependencyWorldCollisions` | Подключает фазу, хранилище участков, предикаты участников, дерево и контекстное действие последствия. |
 
-**Шаг мира** (ветки `world-update`/`game-ticks`):
-- `WorldStepFactory` создаёт «кадр» — предмет со свойствами `Battle` и `Items` (снимок хранилища) — и вызывает действие `WorldStep` (`Commands.Action`).
-- Фазы задаются JSON: `{"phases":[{"name":"…","execution":"World"|"Items","action":"…","selector":"…"}]}`. `World` — действие над кадром; `Items` — действие для каждого предмета, прошедшего селектор (`Func<IGameItem,bool>` по ключу `selector`); для `World` селектор указывать нельзя.
-- Загрузка и регистрация: `RegisterIoCDependencyWorldPhaseConfigurationLoader` → `RegisterIoCDependencyConfiguredWorldPhases(path[, action])`. Дубли имён фаз и подмена `Commands.Action`/`Commands.Macro` запрещены (`FormatException`).
+В партии двух флотилий фазы тика запускают полёт снарядов и определяют итог после коллизий. `RegisterIoCDependencyWorldCollisionRules` передаёт всем правилам один `WorldCollisionFrame`. Правило снарядов использует `IProjectileCollisionDetector` для выбора первого контакта по относительному движению. Последствие применяет `Hit`, останавливает полёт и удаляет снаряд.
+
+Действие последствия получает участников в ролях `Target` и `Source`. Фаза проверяет направленные пары разных объектов и пропускает уничтоженные объекты.
+
+Исключение фазы передаётся исполнителю команд и завершает текущий запуск тиков.
 
 ### 3.9 Объектная авторизация (`Authorization/*`)
 
@@ -108,6 +110,15 @@
 Ключи: `Authorization.Policy`, `Factories.AuthorizedAction`, `Commands.AuthorizedAction(subject, action, item)`. Субъект должен быть **доверенным** (из проверенного токена); к `Authentication/*` не привязано.
 
 ---
+### Длительные операции
+
+| Компонент | Назначение |
+|---|---|
+| `LongOperationFactory`, `LongOperationCommands` | Фабрика получает шаг и приёмник команд. Результат содержит связанные команды `Start` и `Stop` для одной операции. |
+| `StartCommand`, `StopCommand` | Управляют запуском и останавливают его через общий экземпляр состояния операции. |
+| `ICommandReceiver`, `CommandReceiver`, `SendCommand` | Ставят команду на последующее выполнение. Для игровой очереди приёмник оборачивает `Game.Post`. |
+| `CommandInjectableCommand`, `RepeatOperationCommand`, `EmptyCommand` | Обёртка делегирует выполнение повторяемому шагу. При остановке выполняет пустую команду. |
+
 ## Часть B. Серверный стек
 
 ### 3.10 Игра
@@ -220,6 +231,8 @@
 Ошибки: `UnauthorizedAccessException` (HTTP 403) для всех отказов. Тесты: `AuthenticationTests`, `PlayerAuthorizationTests`, `AccessRuleConfigurationTests`.
 
 ### 3.20 Правила партии и подстановка команд
+
+`IFleetRoster` предоставляет согласованный список участников при старте. `FleetOrderCommand` получает идентификатор игрока из аутентифицированного сообщения и передаёт запрос в `IFleetOrderActionFactory`. Для одного предмета используется прежняя `IAuthorizedActionFactory`. Для контекстного действия `FleetContextOrder` описывает роль основного предмета и остальные роли. Адаптер `IObjectAccessAreas` определяет области по `Owner` для существующего `InheritedGrantRule`. Снимок содержит список участников. При восстановлении области и права строятся заново.
 
 Параметры адресуются публичным именам. `objects.<вид>` относится к предметам с данным `Kind`, а `commands.<шаг>` — к фабрике шага с данным именем. Сопоставление учитывает регистр. Имена и JSON согласуются в лобби и восстанавливаются из снимка.
 
