@@ -11,7 +11,7 @@ public sealed partial class ManagedGameHost(
     private IManagedGame _game = game;
     private IServerThread _thread = thread;
     private IGameRunner _runner = runner;
-    internal Action ActivateGame { get; set; } = () => { };
+    internal GameActivation Activation { get; set; } = GameActivation.None;
     public IManagedGame Game => _game;
     public IGameRunner Runner => _runner;
     public string Id => _game.Id;
@@ -66,7 +66,7 @@ public sealed partial class ManagedGameHost(
         _game.Paused = false;
         // The runner also handles a restored queue which was filled before it was created.
         wake(_runner);
-        ActivateGame();
+        Activation.Activate();
     });
 
     public async Task<string> PauseAndSnapshot()
@@ -81,6 +81,7 @@ public sealed partial class ManagedGameHost(
             {
                 _game.Paused = true;
                 using var entered = _game.Scope.Enter();
+                Activation.Suspend();
                 snapshot(_game, text => json = text).Execute();
             });
         }

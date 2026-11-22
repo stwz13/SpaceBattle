@@ -205,7 +205,7 @@ HTTP 202 подтверждает постановку в очередь. При
 
 ## 13. Проверить завершение боя
 
-Запустите согласованную партию из двух участников и создайте корабли обеих флотилий. Для стрельбы передайте `FleetOrder` с действием `Shooting`. Тики идут с интервалом `Server:BattleTickMilliseconds` (по умолчанию 100 мс). Список видов кораблей задаётся `Server:BattleShipKinds` (по умолчанию `Ship` и `Tanker`).
+Запустите согласованную партию из двух участников и создайте корабли обеих флотилий. Для стрельбы передайте `FleetOrder` с действием `Shooting`. Тики идут с интервалом `Server:BattleTickMilliseconds` (по умолчанию 100 мс). Серверный `BattleTick.config` задаёт фазы: наблюдение за флотилиями, продвижение снарядов, повторное наблюдение. Список видов кораблей задаётся `Server:BattleShipKinds` (по умолчанию `Ship` и `Tanker`).
 
 Запрос `GET /games/match/result` с JWT для `match` возвращает состояние партии и победителя. После выбывания всей флотилии `p2` ответ имеет вид:
 
@@ -214,3 +214,51 @@ HTTP 202 подтверждает постановку в очередь. При
 ```
 
 Для демонстрации с перезапуском укажите в `Server:ItemKinds` все свойства кораблей, используемые в сценарии. Например, для стрельбы и попаданий сохраняйте `Owner`, `Position`, `Direction`, `Health`, `Destroyed`, `Ammo`, `ProjectileSpeed` и `ProjectileDamage`. Схема снаряда есть в штатной конфигурации. Незавершённый бой после восстановления продолжает тики, завершённый сохраняет победителя.
+
+## 14. Запустить длительную операцию
+
+В примере `game` — игра, а `move` и `checkCollisions` — готовые игровые команды. Соберите один шаг как макрокоманду и создайте пару команд управления.
+
+```csharp
+new RegisterIoCDependencyLongOperations().Execute();
+var step = new MacroCommand([move, checkCollisions]);
+var operation = Ioc.Resolve<LongOperationCommands>(
+    LongOperationDependencies.Create, step, new CommandReceiver(game.Post));
+game.Post(operation.Start);
+```
+
+Сохраните `operation` и при необходимости поставьте `operation.Stop` в ту же очередь. Вызывайте `Game.Post` на её потоке-владельце. При запуске нескольких операций создайте отдельную пару для каждой. Если шаг должен повторяться с заданным интервалом, используйте планирование по времени. Немедленное добавление в хвост даёт порядок FIFO.
+
+## 15. Подключить тики игры
+
+Штатный `Tick.config` включает фазу `World.CheckCollisions`. В примере `collisionTablesDirectory` содержит таблицу `Ship-Torpedo.collisions`, а предикаты `isShip` и `isTorpedo` выбирают участников в ролях `Target` и `Source`.
+
+```csharp
+// В скоупе игры с зарегистрированным IBattleContext.
+new RegisterIoCDependencyMacroCommand().Execute();
+new RegisterIoCDependencyActionConfigurations(Path.Combine(AppContext.BaseDirectory, "Config")).Execute();
+new RegisterIoCDependencyLongOperations().Execute();
+new RegisterIoCDependencyWorldTicks().Execute();
+new RegisterIoCDependencyCollisions(collisionTablesDirectory).Execute();
+new RegisterIoCDependencyContextActionComposition().Execute();
+new RegisterIoCDependencyCodeGeneration().Execute();
+new RegisterIoCDependencyGeneratedStrategiesWithAdapters([typeof(DestroyIfDeadCommand).Assembly],
+    [typeof(IDamageTarget), typeof(IDamageSource)], []).Execute();
+new RegisterIoCDependencyDamageContextCommand("Context.ApplyDamage", "Target", "Source").Execute();
+new RegisterIoCDependencyContextCommand("Context.DestroyIfDead",
+    GeneratedNames.CommandDependency(typeof(DestroyIfDeadCommand)), "Target").Execute();
+new RegisterIoCDependencyWorldCollisions(isShip, isTorpedo, "Collisions.Ship-Torpedo", "Hit").Execute();
+var ticks = Ioc.Resolve<LongOperationCommands>(GameTickDependencies.Create, new CommandReceiver(game.Post));
+game.Post(ticks.Start);
+```
+
+Порядок фаз задаёт файл `Tick.config` в зарегистрированном каталоге. Чтобы переставить или исключить фазу, измените список ключей. Чтобы добавить фазу, зарегистрируйте ключ, принимающий `IReadOnlyCollection<IGameItem>` и возвращающий `ICommand`, затем впишите его в конфиг. Конфиг читается при выполнении каждого тика. Пустой список фаз даёт пустой шаг, а длительная операция продолжает ставить тики до остановки.
+
+Команда, которая переместила объект, передаёт в фазу его фактические начальную и конечную позиции. Записывайте один участок на объект за интервал тика из той же игровой очереди.
+
+```csharp
+var segments = Ioc.Resolve<WorldMovementSegments>(WorldCollisionDependencies.MovementSegments);
+segments.Record(item, start, end);
+```
+
+Для остановки поставьте `ticks.Stop` в ту же очередь. Для одного шага разрешите `Ioc.Resolve<ICommand>(GameTickDependencies.Step)` и поставьте полученную команду отдельно. Игра выполняет команды на потоке-владельце своего скоупа и очереди.

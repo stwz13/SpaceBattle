@@ -1,38 +1,83 @@
 namespace SpaceBattle.Lib;
 
-internal sealed class BattleTickDriver(IGameTickFactory factory, TimeSpan step, Action<Exception> report)
+internal sealed class BattleTickDriver
 {
-    public Action Attach(IManagedGameHost host, ICommand stepCommand, Func<bool> finished)
+    private readonly IManagedGameHost _host;
+    private readonly TimeProvider _time;
+    private readonly TimeSpan _period;
+    private readonly Func<bool> _finished;
+    private readonly Action<Exception> _report;
+    private readonly LongOperationCommands _ticks;
+    private ITimer? _timer;
+    private object? _dispatch;
+
+    public BattleTickDriver(IManagedGameHost host, TimeProvider time, TimeSpan period, Func<bool> finished,
+        Func<ICommandReceiver, LongOperationCommands> create, Action<Exception> report)
     {
-        IGameTicks? ticks = null;
-        var world = new CallbackCommand(() =>
-        {
-            if (host.State == GameHostState.Running && !host.Game.Paused)
-                stepCommand.Execute();
-            if (finished()) ticks!.Stop();
-        });
-        ticks = factory.Create(step, world, command =>
-        {
-            if (host.State is GameHostState.Stopped or GameHostState.Moved)
-            {
-                ticks!.Stop();
-                return;
-            }
-            _ = Deliver(host, command, ticks!);
-        });
-        return () =>
-        {
-            if (!finished()) ticks.Start();
-        };
+        _host = host;
+        _time = time;
+        _period = period;
+        _finished = finished;
+        _report = report;
+        _ticks = create(new CommandReceiver(Schedule));
     }
 
-    private async Task Deliver(IManagedGameHost host, ICommand command, IGameTickControl ticks)
+    public void Activate()
     {
-        try { await host.Execute(command.Execute).ConfigureAwait(false); }
+        if (!_finished())
+            Run(_ticks.Start);
+    }
+
+    public void Suspend()
+    {
+        _ticks.Stop.Execute();
+        _dispatch = null;
+        _timer?.Dispose();
+        _timer = null;
+    }
+
+    private void Schedule(ICommand continuation)
+    {
+        var dispatch = new object();
+        _dispatch = dispatch;
+        _timer = _time.CreateTimer(_ => { _ = Deliver(dispatch, continuation); }, null, _period, Timeout.InfiniteTimeSpan);
+    }
+
+    private async Task Deliver(object dispatch, ICommand continuation)
+    {
+        try
+        {
+            await _host.Execute(() =>
+            {
+                if (!ReferenceEquals(_dispatch, dispatch))
+                    return;
+                _timer?.Dispose();
+                _timer = null;
+                _host.Runner.Post(new TransientGameCommand(new CallbackCommand(() =>
+                {
+                    if (ReferenceEquals(_dispatch, dispatch))
+                        Run(continuation);
+                })));
+            }).ConfigureAwait(false);
+        }
         catch (Exception error)
         {
-            ticks.Stop();
-            report(error);
+            _report(error);
+        }
+    }
+
+    private void Run(ICommand command)
+    {
+        try
+        {
+            command.Execute();
+            if (_finished())
+                Suspend();
+        }
+        catch (Exception error)
+        {
+            Suspend();
+            _report(error);
         }
     }
 }

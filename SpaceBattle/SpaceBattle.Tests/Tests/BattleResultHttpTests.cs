@@ -54,6 +54,7 @@ public sealed class BattleResultHttpTests
 
         var store = new MemorySnapshotStore(new());
         await host.Application.Runtime.SnapshotAndStop(store).WaitAsync(Timeout);
+        Assert.Null(time.NextDeadline);
         var restoredTime = new TickTestClock();
         await using var destination = new Factory(restoredTime);
         using var winner = Player(destination, "p1");
@@ -80,6 +81,75 @@ public sealed class BattleResultHttpTests
         await finalHost.Application.Runtime.Restore(finished).WaitAsync(Timeout);
         Assert.Equal(new BattleProgress(true, true, "p1"), await Result(spectator));
         Assert.Null(finishedTime.NextDeadline);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task A_Due_Tick_Does_Not_Run_After_The_Game_Is_Paused_And_Resumes_Once(bool pauseBeforeDelivery)
+    {
+        var time = new TickTestClock();
+        await using var host = new Factory(time);
+        using var first = Player(host, "p1");
+        using var second = Player(host, "p2");
+        await Start(first, second);
+        var game = Game(host);
+        await Ship(first, "s1", "p1", 0);
+        await Ship(second, "s2", "p2", 5);
+        await game.Enqueue(() => { }).WaitAsync(Timeout);
+
+        Task<string>? snapshot = null;
+        await game.Execute(() =>
+        {
+            if (pauseBeforeDelivery)
+                snapshot = game.PauseAndSnapshot();
+            else
+                game.Game.Paused = true;
+
+            time.Advance(Period);
+            time.FireDue();
+            snapshot ??= game.PauseAndSnapshot();
+        }).WaitAsync(Timeout);
+        var saved = await snapshot!.WaitAsync(Timeout);
+        using var json = System.Text.Json.JsonDocument.Parse(saved);
+        Assert.Empty(json.RootElement.GetProperty("commands").EnumerateArray());
+        await game.Execute(() =>
+        {
+            Assert.Equal(pauseBeforeDelivery ? 0 : 1, game.Game.Pending.Count);
+            Assert.Null(time.NextDeadline);
+        }).WaitAsync(Timeout);
+        Assert.Equal(new BattleProgress(false, false, null), await Result(first));
+
+        await game.Resume().WaitAsync(Timeout);
+        await game.Enqueue(() => { }).WaitAsync(Timeout);
+        Assert.Equal(new BattleProgress(false, false, null), await Result(first));
+        await Tick(time, game);
+        Assert.Equal(new BattleProgress(true, false, null), await Result(first));
+    }
+
+    [Fact]
+    public async Task A_Failed_Battle_Phase_Stops_The_Tick_At_The_Current_Step()
+    {
+        var time = new TickTestClock();
+        await using var host = new Factory(time);
+        using var first = Player(host, "p1");
+        using var second = Player(host, "p2");
+        await Start(first, second);
+        var game = Game(host);
+        await Ship(first, "s1", "p1", 0);
+        await Ship(second, "s2", "p2", 5);
+        await game.Enqueue(() =>
+        {
+            var broken = new TestGameItem();
+            broken.SetProperty("Kind", "Projectile");
+            broken.SetProperty("Owner", "p1");
+            Items().Add("broken", broken);
+        }).WaitAsync(Timeout);
+
+        await Tick(time, game);
+
+        Assert.Null(time.NextDeadline);
+        Assert.Equal(new BattleProgress(true, false, null), await Result(first));
     }
 
     private static async Task Start(HttpClient first, HttpClient second)
@@ -125,9 +195,11 @@ public sealed class BattleResultHttpTests
 
     private static async Task Tick(TickTestClock time, IManagedGameHost game)
     {
+        await game.Execute(() => { }).WaitAsync(Timeout);
+        Assert.NotNull(time.NextDeadline);
         time.Advance(Period);
         time.FireDue();
-        await game.Execute(() => { }).WaitAsync(Timeout);
+        await game.Enqueue(() => { }).WaitAsync(Timeout);
     }
 
     private static Task<BattleProgress?> Result(HttpClient client) => client.GetFromJsonAsync<BattleProgress>($"/games/{GameId}/result");

@@ -133,13 +133,17 @@
 
 | Ключ | Аргументы | Результат |
 |---|---|---|
-| `Factories.GameTicks` | – | `IGameTickFactory` |
-| `GameTicks.Create` | `TimeSpan step, ICommand worldStep, Action<ICommand> post[, int maxCatchUp]` | `IGameTicks` |
-| `Commands.GameTicks.Start`, `Commands.GameTicks.Stop` | `IGameTickControl` | `Lib.ICommand` |
-| `Factories.WorldStep`, `Commands.WorldStep` | – | фабрика и команда шага мира |
-| `WorldStep.Frame` | – | предмет-кадр (`Battle`, `Items`) |
-| `WorldStep.Phases.<длина>.<action>.<имя>` | – | команда фазы |
-| `Configuration.WorldPhases.Loader` | – | `IWorldPhaseConfigurationLoader` |
+| `GameTicks.Step` | – | `ICommand` одного тика мира |
+| `GameTicks.Create` | `ICommandReceiver receiver` | `LongOperationCommands` с командами `Start` и `Stop` |
+| `Tick.Config` | – | Список ключей фаз из `Tick.config` в порядке выполнения |
+| `World.CheckCollisions` | `IReadOnlyCollection<IGameItem> items` | `ICommand` проверки столкновений для текущего тика |
+| `World.Collisions.MovementSegments` | – | Экземпляр `WorldMovementSegments` для текущей игры |
+
+`RegisterIoCDependencyWorldTicks` можно вызвать в скоупе игры или в его родителе. Разрешайте `GameTicks.Step` и `GameTicks.Create` в скоупе игры, где зарегистрирован её `IBattleContext`. Для `GameTicks.Create` зарегистрируйте также `LongOperations.Create` до разрешения ключа.
+
+Перед выполнением тика зарегистрируйте `Commands.Macro`, загрузите каталог с `Tick.config` через `RegisterIoCDependencyActionConfigurations` и подключите ключи перечисленных фаз.
+
+Вызовите `RegisterIoCDependencyWorldCollisions` в скоупе каждой игры, использующей фазу `World.CheckCollisions`. Передайте предикаты цели и источника, ключ `CollisionTree` и имя контекстного действия с ролями `Target` и `Source`.
 
 ## K. Порядок регистрации
 
@@ -167,4 +171,12 @@
 
 `Auth.ItemPermissions` возвращает `IPlayerItemPermissions`, используемый также в конвейере авторизации сообщений. Для дополнительных ролей `FleetOrder` фабрика проверяет допуск к идентификаторам через этот контракт. Дерево прав проверяется для каждого объекта команды до вызова `Commands.ContextAction`.
 
-`Games.Activate` возвращает фабрику обратного вызова активации для хоста партии. В скоупе боя обратный вызов запускает тики. `Battle.Progress` возвращает функцию чтения текущего результата на потоке игры. Снимок хранит результат вместе с правилами партии.
+`Games.Activate` возвращает фабрику действий запуска и приостановки для хоста партии. В скоупе боя эти действия управляют длительной операцией тика. `Battle.TickPhases` возвращает ключи фаз из серверного `BattleTick.config`. Фазам передаётся снимок `IReadOnlyCollection<IGameItem>`. `Battle.Progress` возвращает функцию чтения текущего результата на потоке игры. Снимок хранит результат вместе с правилами партии.
+
+## M. Длительные операции
+
+| Ключ | Аргументы | Результат | Регистрация |
+|---|---|---|---|
+| `LongOperations.Create` (`LongOperationDependencies.Create`) | `ICommand step, ICommandReceiver receiver` | `LongOperationCommands` с командами `Start` и `Stop` для новой операции | `RegisterIoCDependencyLongOperations` |
+
+Вызовите регистрацию явно в выбранном скоупе перед разрешением ключа. Каждое разрешение создаёт отдельную операцию. Для запуска и остановки используйте команды из одной пары. Передайте приёмник, связанный с очередью этой игры.

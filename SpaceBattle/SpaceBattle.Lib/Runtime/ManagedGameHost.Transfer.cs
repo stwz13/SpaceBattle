@@ -17,7 +17,7 @@ public sealed partial class ManagedGameHost
             Array.ForEach(commands, command => command.Execute());
             _game.Paused = false;
             wake(_runner);
-            ActivateGame();
+            Activation.Activate();
         });
     }
 }

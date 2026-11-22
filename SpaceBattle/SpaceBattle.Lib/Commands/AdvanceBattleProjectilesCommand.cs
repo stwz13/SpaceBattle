@@ -2,13 +2,13 @@ namespace SpaceBattle.Lib;
 
 internal sealed class AdvanceBattleProjectilesCommand : ICommand
 {
-    private readonly IGameItemStorage _items;
+    private readonly IReadOnlyCollection<IGameItem> _items;
     private readonly IBattleShipClassifier _ships;
     private readonly IProjectileCollisionDetector _collisions;
-    private readonly Func<ICommandContext, ICommand> _hit;
+    private readonly Func<IGameItem, IGameItem, ICommand> _hit;
 
-    public AdvanceBattleProjectilesCommand(IGameItemStorage items, IBattleShipClassifier ships, IProjectileCollisionDetector collisions,
-        Func<ICommandContext, ICommand> hit)
+    public AdvanceBattleProjectilesCommand(IReadOnlyCollection<IGameItem> items, IBattleShipClassifier ships, IProjectileCollisionDetector collisions,
+        Func<IGameItem, IGameItem, ICommand> hit)
     {
         ArgumentNullException.ThrowIfNull(items);
         ArgumentNullException.ThrowIfNull(ships);
@@ -22,9 +22,8 @@ internal sealed class AdvanceBattleProjectilesCommand : ICommand
 
     public void Execute()
     {
-        var frame = _items.GetSnapshot();
-        var ships = frame.Where(_ships.IsShip).ToArray();
-        foreach (var projectile in frame.Where(item =>
+        var ships = _items.Where(_ships.IsShip).ToArray();
+        foreach (var projectile in _items.Where(item =>
                      BattleItemProperties.Read<string>(item, SerializationDependencies.KindProperty) == "Projectile"))
         {
             var owner = BattleItemProperties.Read<string>(projectile, "Owner");
@@ -41,13 +40,7 @@ internal sealed class AdvanceBattleProjectilesCommand : ICommand
                 continue;
             }
 
-            _hit(new CommandContext(new Dictionary<string, IGameItem>
-            {
-                ["Source"] = projectile,
-                ["Target"] = target
-            })).Execute();
-            target.SetProperty("Destroyed", true);
-            _items.Remove((string)projectile.GetProperty(SerializationDependencies.IdProperty));
+            _hit(projectile, target).Execute();
         }
     }
 }
