@@ -19,12 +19,12 @@ internal static class PlayerProgramComposition
             return limits;
         });
         services.TryAddSingleton(_ => Required<DockerProgramSettings>(settings, "Docker"));
-        services.AddSingleton<IPlayerProgramLanguage>(provider => ContainerProgramLanguage.Python(
-            Required<ContainerLanguageSettings>(settings, "Python"),
-            provider.GetRequiredService<IPlayerProgramSandbox>()));
-        services.AddSingleton<IPlayerProgramLanguage>(provider => ContainerProgramLanguage.JavaScript(
-            Required<ContainerLanguageSettings>(settings, "JavaScript"),
-            provider.GetRequiredService<IPlayerProgramSandbox>()));
+        foreach (var key in settings.GetSection("Languages").Get<string[]>() ?? [])
+        {
+            services.AddSingleton<IPlayerProgramLanguage>(provider => ContainerProgramLanguage.Create(
+                Required<ContainerLanguageSettings>(settings, key),
+                provider.GetRequiredService<IPlayerProgramSandbox>()));
+        }
         services.TryAddSingleton<IPlayerProgramStore, MemoryPlayerProgramStore>();
         services.TryAddSingleton<IPlayerProgramGame, PlayerProgramGame>();
         services.TryAddSingleton<IProgramProcess>(provider =>

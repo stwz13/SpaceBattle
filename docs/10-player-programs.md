@@ -11,7 +11,7 @@ docker pull python:3.12-alpine
 docker pull node:22-alpine
 ```
 
-Сервер поддерживает `python` и `javascript`. Список возвращает `GET /programs/languages`. Имена языков, доверенные образы и исполняемые файлы задаются в секциях `PlayerPrograms:Python` и `PlayerPrograms:JavaScript` файла `appsettings.json`.
+Сервер поддерживает `python` и `javascript`. Список возвращает `GET /programs/languages`. Список секций языков задаёт `PlayerPrograms:Languages`. Каждая секция указывает имя языка, доверенный образ, исполняемый файл, аргументы и путь к служебному скрипту `Bootstrap` относительно каталога приложения. При сборке и публикации скрипты копируются из `PlayerPrograms/Bootstraps`.
 
 Укажите в `$source` путь к файлу вашей программы, а в `$token` — JWT игрока для партии `match`.
 

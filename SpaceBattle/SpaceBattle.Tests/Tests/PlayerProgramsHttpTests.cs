@@ -60,6 +60,8 @@ public sealed class PlayerProgramsHttpTests
         Assert.Equal("s1", Assert.Single(turn.GetProperty("ships").EnumerateArray()).GetProperty("id").GetString());
         Assert.Contains("python:3.12-alpine", host.Engine.CreateArguments);
         Assert.DoesNotContain("print('null')", host.Engine.CreateArguments);
+        Assert.Equal(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "PlayerPrograms", "Bootstraps", "python.py")),
+            host.Engine.CreateArguments[^1]);
 
         host.Engine.Output = """{"id":"s2","action":"Rotation"}""";
         await Invoke(first, HttpStatusCode.Accepted);
@@ -77,6 +79,8 @@ public sealed class PlayerProgramsHttpTests
         host.Engine.Output = "null";
         await Invoke(second, HttpStatusCode.NoContent);
         Assert.Contains("node:22-alpine", host.Engine.CreateArguments);
+        Assert.Equal(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "PlayerPrograms", "Bootstraps", "javascript.cjs")),
+            host.Engine.CreateArguments[^1]);
         host.Engine.CreateExitCode = 125;
         await Invoke(second, HttpStatusCode.ServiceUnavailable);
         await Invoke(outside, HttpStatusCode.NotFound);
