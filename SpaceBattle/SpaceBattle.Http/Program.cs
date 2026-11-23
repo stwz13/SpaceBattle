@@ -10,6 +10,7 @@ public partial class Program
         ApiEndpoints.Map(app);
         GameRuleEndpoints.Map(app);
         BattleResultEndpoints.Map(app);
+        PlayerProgramEndpoints.Map(app);
         app.Run();
     }
 }

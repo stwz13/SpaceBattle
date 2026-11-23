@@ -9,6 +9,7 @@ public static class HostComposition
     {
         services.TryAddSingleton(_ => configuration.GetSection("Server").Get<ServerOptions>() ?? new ServerOptions());
         services.TryAddSingleton<GameRuleRooms>();
+        PlayerProgramComposition.Configure(services, configuration);
         services.TryAddSingleton<IProjectileCollisionDetector, SegmentProjectileCollisionDetector>();
         services.TryAddSingleton<IBattleShipClassifier>(_ => new BattleShipKindClassifier(
             configuration.GetSection("Server:BattleShipKinds").Get<string[]>() ?? ["Ship", "Tanker"]));
