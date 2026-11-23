@@ -47,6 +47,28 @@ public class AuthenticationTests
     }
 
     [Fact]
+    public async Task Authentication_Accepts_Absent_Args_And_Rejects_Incompatible_Inputs()
+    {
+        await using var fixture = new RuntimeFixture();
+        Configure(fixture);
+        var message = new Message("a", "CreateItem", default);
+        var player = new PlayerIdentity("p1", "a", false);
+        var authenticated = fixture.Resolve<IAuthenticatedMessage>(AuthenticationDependencies.Authenticate, message, player);
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, authenticated.Args.ValueKind);
+        Assert.Equal("p1", authenticated.PlayerId);
+        Assert.Throws<ArgumentException>(() => fixture.Resolve<IMessage>(AuthenticationDependencies.Authenticate, message));
+        Assert.Throws<ArgumentException>(() => fixture.Resolve<IMessage>(AuthenticationDependencies.Authenticate, "message", player));
+        Assert.Throws<ArgumentException>(() => fixture.Resolve<IMessage>(AuthenticationDependencies.Authenticate, message, "player"));
+    }
+
+    [Fact]
+    public void Signing_Keys_Shorter_Than_32_Utf8_Bytes_Are_Rejected_Before_Registration()
+    {
+        var registration = new RegisterIoCDependencyJwtAuthentication("SpaceBattle", "Players", new string('x', 31));
+        Assert.Throws<ArgumentException>(registration.Execute);
+    }
+
+    [Fact]
     public async Task Valid_Token_Binds_Player_And_Game_And_Rejects_Cross_Game_Messages()
     {
         await using var fixture = new RuntimeFixture();

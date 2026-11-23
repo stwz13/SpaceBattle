@@ -54,6 +54,39 @@ public class GameRuleParameterTests
         Assert.Empty(rules.Parameters);
     }
 
+    [Fact]
+    public void Structured_Actions_Can_Omit_Parameters()
+    {
+        var rules = Read("""{"actions":{"Rotation":["Mods.Rotate"]}}""");
+        Assert.Equal("Mods.Rotate", Assert.Single(rules.Actions["Rotation"]));
+        Assert.Empty(rules.Parameters);
+    }
+
+    [Theory]
+    [InlineData("""{"actions":{"Rotation":["Mods.Rotate"]},"unknown":{}}""", "Unknown field")]
+    [InlineData("""{"actions":[],"parameters":{}}""", "Expected objects")]
+    [InlineData("""{"actions":{},"parameters":null}""", "Expected objects")]
+    public void Structured_Rules_Reject_Unknown_Fields_And_Invalid_Section_Types(string json, string error)
+    {
+        var exception = Assert.Throws<JsonException>(() => Read(json));
+        Assert.Contains(error, exception.Message);
+    }
+
+    [Fact]
+    public void Property_Bindings_Require_A_Readable_Contract_Of_The_Expected_Type()
+    {
+        Assert.Throws<ArgumentException>(() => GameObjectRuleProperty<int>.For<GameItem, int>("Speed", (value, _) => value));
+        Assert.Throws<ArgumentException>(() => GameObjectRuleProperty<int>.For<IMoving, int>("Missing", (value, _) => value));
+        Assert.Throws<ArgumentException>(() => GameObjectRuleProperty<int>.For<IWriteOnlySetting, int>("Speed", (value, _) => value));
+        Assert.Throws<ArgumentException>(() =>
+            GameObjectRuleProperty<int>.For<IMoving, int>(nameof(IMoving.Velocity), (value, _) => value));
+    }
+
+    private interface IWriteOnlySetting
+    {
+        int Speed { set; }
+    }
+
     private static GameActionRules Read(string json)
     {
         using var document = JsonDocument.Parse(json);

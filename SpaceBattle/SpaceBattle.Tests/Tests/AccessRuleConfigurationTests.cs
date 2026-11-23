@@ -10,10 +10,49 @@ public class AccessRuleConfigurationTests
     [InlineData("{}")]
     [InlineData("{\"properties\":[]}")]
     [InlineData("{\"properties\":{\"Owner\":{\"type\":\"int\",\"value\":1}}}")]
+    [InlineData("""{"properties":{"Owner":"p"}}""")]
+    [InlineData("""{"properties":{"Owner":{"value":"p"}}}""")]
+    [InlineData("""{"properties":{"Owner":{"type":1,"value":"p"}}}""")]
+    [InlineData("""{"properties":{"Owner":{"type":"string"}}}""")]
+    [InlineData("""{"properties":{"Owner":{"type":"string","value":1}}}""")]
     public void Malformed_Owner_Claims_Are_Denied(string json)
     {
         var message = new AuthenticatedMessage(new Message("a", "CreateItem", JsonSerializer.Deserialize<JsonElement>(json)), "p");
         Assert.Throws<UnauthorizedAccessException>(() => new NewItemOwnerRule().Check(message, "s", new ScopedItemOwners(() => new GameItemStorage())));
+    }
+
+    [Theory]
+    [InlineData("unknown-command")]
+    [InlineData("missing-list")]
+    [InlineData("empty-list")]
+    [InlineData("missing-rule")]
+    public void An_Incomplete_Access_Rule_Configuration_Is_Rejected(string problem)
+    {
+        IReadOnlyList<IAccessRule> rules = problem switch
+        {
+            "missing-list" => null!,
+            "empty-list" => [],
+            "missing-rule" => [null!],
+            _ => [new ExistingItemOwnerRule()]
+        };
+        var command = problem == "unknown-command" ? "Unknown" : "Known";
+        var registration = new RegisterIoCDependencyPlayerAuthorization(
+            new Dictionary<string, string> { ["Known"] = "id" },
+            new Dictionary<string, PlayerAccessOptions>(),
+            new Dictionary<string, IReadOnlyList<IAccessRule>> { [command] = rules });
+        Assert.Throws<ArgumentException>(registration.Execute);
+    }
+
+    [Theory]
+    [InlineData(" ", "id", "p")]
+    [InlineData("Command", " ", "p")]
+    [InlineData("Command", "id", " ")]
+    public void Empty_Command_Target_And_Player_Names_Are_Rejected(string command, string target, string player)
+    {
+        var registration = new RegisterIoCDependencyPlayerAuthorization(
+            new Dictionary<string, string> { [command] = target },
+            new Dictionary<string, PlayerAccessOptions> { [player] = new() });
+        Assert.Throws<ArgumentException>(registration.Execute);
     }
     [Fact]
     public async Task A_New_Command_Can_Configure_Its_Rules_Without_Changing_The_Interpreter()
