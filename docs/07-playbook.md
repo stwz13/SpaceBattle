@@ -64,6 +64,16 @@ curl -X POST http://localhost:5000/messages \
 ```
 Ответ `202` значит «принято в очередь игры», а не «выполнено». Чтобы команда прошла, она должна быть в `AllowedCommands`, у игрока в `Players.<id>.Commands`, а в `CommandTargets` — иметь поле с id предмета. Коды ошибок — [03-modules.md](03-modules.md) §3.18.
 
+Для явного задания начального состояния нового корабля используйте такой блок `args.properties` в `CreateItem`:
+
+```json
+{
+  "Fuel": { "type": "int", "value": 10 },
+  "Owner": { "type": "string", "value": "p1" },
+  "Destroyed": { "type": "bool", "value": false }
+}
+```
+
 ## 3. Собрать сервер в тесте или приложении
 
 ```csharp
