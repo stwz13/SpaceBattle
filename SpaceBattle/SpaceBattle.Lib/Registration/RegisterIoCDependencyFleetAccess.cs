@@ -25,6 +25,7 @@ internal sealed class RegisterIoCDependencyFleetAccess : ICommand
         {
             var fleet = FleetObjectAccessAreas.For(player);
             tree.Add(fleet, battle);
+            grants.Grant(player, FleetPermissions.ReadShipState, fleet);
             foreach (var action in actions)
                 grants.Grant(player, action, fleet);
         }

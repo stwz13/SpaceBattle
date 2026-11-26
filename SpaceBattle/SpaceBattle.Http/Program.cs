@@ -11,6 +11,7 @@ public partial class Program
         PlayerTokenEndpoints.Map(app);
         GameRuleEndpoints.Map(app);
         BattleResultEndpoints.Map(app);
+        PlayerProgramEndpoints.Map(app);
         app.Run();
     }
 }

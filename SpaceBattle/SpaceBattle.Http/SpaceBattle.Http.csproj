@@ -6,5 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../SpaceBattle.Lib/SpaceBattle.Lib.csproj" />
+    <None Update="PlayerPrograms/Bootstraps/*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
