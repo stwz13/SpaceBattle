@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using App;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -44,6 +45,18 @@ public sealed class PlayerProgramsHttpTests
         await CreateShip(first, "s1", "p1");
         await CreateShip(second, "s2", "p2");
         await game.Enqueue(() => { }).WaitAsync(Timeout);
+        await game.Execute(() =>
+        {
+            var items = Ioc.Resolve<IGameItemStorage>(GameItemStorageDependencies.Storage);
+            items.Add("destroyed", new GameItem(new Dictionary<string, object>
+            {
+                ["Id"] = "destroyed", ["Kind"] = "Ship", ["Owner"] = "p1", ["Destroyed"] = true
+            }));
+            items.Add("probe", new GameItem(new Dictionary<string, object>
+            {
+                ["Id"] = "probe", ["Kind"] = "Probe", ["Owner"] = "p1"
+            }));
+        }).WaitAsync(Timeout);
 
         host.Engine.Output = """{"id":"s1","action":"Rotation","playerId":"p2","gameId":"other"}""";
         await Invoke(first, HttpStatusCode.Accepted);
@@ -105,6 +118,45 @@ public sealed class PlayerProgramsHttpTests
         using var packet = JsonDocument.Parse(host.Engine.Input);
         var ships = packet.RootElement.GetProperty("turn").GetProperty("ships").EnumerateArray();
         Assert.Equal("s1", Assert.Single(ships).GetProperty("id").GetString());
+    }
+
+    [Fact]
+    public async Task A_Program_Does_Not_Start_In_Suspended_Or_Completed_Games()
+    {
+        await using var host = new Factory();
+        using var first = Player(host, "p1");
+        using var second = Player(host, "p2");
+        await Upload(first, "python", "print('null')", HttpStatusCode.NoContent);
+        var server = host.Services.GetRequiredService<IServerApplication>();
+        server.Runtime.Add(GameId, new UnmanagedGame());
+        await Invoke(first, HttpStatusCode.NotFound);
+        Assert.True(server.Runtime.Remove(GameId));
+
+        await Start(first, second);
+        var game = Assert.IsAssignableFrom<IManagedGameHost>(server.Runtime.Find(GameId));
+        var snapshot = await game.PauseAndSnapshot().WaitAsync(Timeout);
+        await Invoke(first, HttpStatusCode.Conflict);
+        Assert.Empty(host.Engine.CreateArguments);
+        await game.Resume().WaitAsync(Timeout);
+
+        var state = JsonNode.Parse(snapshot)!;
+        var actionRules = state["extensions"]!["actionRules"]!.AsObject();
+        actionRules["battleProgress"] = JsonSerializer.SerializeToNode(new BattleProgress(true, true, "p2"));
+        actionRules.Remove("movementSegments");
+        var store = new MemorySnapshotStore(new());
+        store.Save(GameId, state.ToJsonString());
+        await using var destination = new Factory();
+        using var restored = Player(destination, "p1");
+        await Upload(restored, "python", "print('null')", HttpStatusCode.NoContent);
+        var target = destination.Services.GetRequiredService<IServerApplication>();
+        await target.Runtime.Restore(store).WaitAsync(Timeout);
+        await Invoke(restored, HttpStatusCode.Conflict);
+        Assert.Empty(destination.Engine.CreateArguments);
+    }
+
+    private sealed class UnmanagedGame : IGameHost
+    {
+        public void Send(IMessage message) => throw new InvalidOperationException();
     }
 
     private static async Task Start(HttpClient first, HttpClient second)

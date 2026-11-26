@@ -7,6 +7,30 @@ namespace SpaceBattle.Tests;
 public class PlayerAuthorizationTests
 {
     [Theory]
+    [InlineData("null")]
+    [InlineData("{}")]
+    [InlineData("""{"shipId":13}""")]
+    [InlineData("""{"shipId":" "}""")]
+    public void A_Command_Target_Requires_A_String_Identifier(string args)
+    {
+        ITargetItemResolver targets = new TargetItemResolver(new Dictionary<string, string> { ["Move"] = "shipId" });
+        var message = new AuthenticatedMessage(new Message("match", "Move", JsonSerializer.Deserialize<JsonElement>(args)), "p1");
+        Assert.Throws<MessageFormatException>(() => targets.Resolve(message));
+    }
+
+    [Fact]
+    public void An_Unknown_Target_Rule_And_A_Disallowed_Command_Are_Rejected()
+    {
+        var args = JsonSerializer.SerializeToElement(new { id = "ship" });
+        var message = new AuthenticatedMessage(new Message("match", "Move", args), "p1");
+        ITargetItemResolver targets = new TargetItemResolver(new Dictionary<string, string>());
+        IPlayerCommandPermissions permissions = new PlayerCommandPermissions(
+            new Dictionary<string, IReadOnlySet<string>> { ["p1"] = new HashSet<string> { "Rotate" } });
+        Assert.Throws<UnauthorizedAccessException>(() => targets.Resolve(message));
+        Assert.Throws<UnauthorizedAccessException>(() => permissions.Check(message));
+    }
+
+    [Theory]
     [InlineData("p", "s", true)]
     [InlineData("other", "s", false)]
     [InlineData("p", "forbidden", false)]

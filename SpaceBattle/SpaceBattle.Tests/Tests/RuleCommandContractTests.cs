@@ -9,6 +9,32 @@ public sealed class RuleCommandContractTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void Factories_Reject_Missing_Extra_And_Incompatible_Inputs(bool configured)
+    {
+        new InitCommand().Execute();
+        Ioc.Resolve<App.ICommand>("IoC.Scope.Current.Set", Ioc.Resolve<object>("IoC.Scope.Create")).Execute();
+        const string step = "Mods.Move";
+        var register = configured
+            ? RegisterIoCDependencyRuleCommand.For<IGameItem, IMoving, int>(step, _ => throw new InvalidOperationException(),
+                new ConfiguredMoveFactory(), value => value.GetInt32(), 0)
+            : RegisterIoCDependencyRuleCommand.For<IGameItem, IMoving>(step, _ => throw new InvalidOperationException(),
+                new MoveFactory());
+        register.Execute();
+        new RegisterIoCDependencyGameActionRules(new GameActionRules(new Dictionary<string, string[]>
+            { ["Movement"] = [step] })).Execute();
+        var item = new GameItem(new Dictionary<string, object>());
+
+        foreach (var args in new object[][] { [], [13], [item, item] })
+        {
+            var error = Assert.Throws<ArgumentException>(() =>
+                Ioc.Resolve<Lib.ICommand>("GameRules.Steps.Mods.Move.Create", args));
+            Assert.Contains(step, error.Message);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void Replacement_Preserves_Move_Contract(bool useReplacement)
     {
         new InitCommand().Execute();
@@ -49,6 +75,12 @@ public sealed class RuleCommandContractTests
     private sealed class MoveFactory : IRuleCommandFactory<IMoving>
     {
         public Lib.ICommand Create(IMoving target) =>
+            new CallbackCommand(() => target.Position += target.Velocity);
+    }
+
+    private sealed class ConfiguredMoveFactory : IConfiguredRuleCommandFactory<IMoving, int>
+    {
+        public Lib.ICommand Create(IMoving target, int settings) =>
             new CallbackCommand(() => target.Position += target.Velocity);
     }
 }
