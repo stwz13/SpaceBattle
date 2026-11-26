@@ -7,6 +7,7 @@ public sealed class RegisterIoCDependencyServerRuntime(ServerOptions options) : 
         new RegisterIoCDependencyGameSnapshot().Execute();
         new RegisterIoCDependencyGameItems().Execute();
         options.ItemKinds.ToList().ForEach(kind => new RegisterIoCDependencyItemKind(kind.Key, kind.Value).Execute());
+        new RegisterIoCDependencyShipDefaults(options.ItemKinds).Execute();
         new RegisterIoCDependencyManagedGames().Execute();
         new RegisterIoCDependencyGameTransfer(options.InboxCapacity).Execute();
         new RegisterIoCDependencyRebalancing().Execute();
