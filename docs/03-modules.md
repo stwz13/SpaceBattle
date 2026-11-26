@@ -208,6 +208,7 @@
 
 | Эндпоинт | Запрос | Ответы |
 |---|---|---|
+| `POST /auth/player-token` | JSON `{login, password, game}` | `200` токен и срок действия, `400` неверная форма запроса, `401` неверные учётные данные, `403` недоступная партия |
 | `POST /messages` | заголовок `Authorization: Bearer <JWT>`; тело — JSON-сообщение `{gameId, command, args}` | `202` принято; `401` нет или неверен токен; `403` токен другой игры / нет права; `400` неверный формат, JSON или команда не из белого списка; `404` игра не найдена; `503` + `Retry-After: 1` сервер перегружен |
 | `POST /games/{id}/transfer` | то же + тело `{"destination": "<имя сервера>"}`; токен должен быть для игры `{id}` и содержать право `transfer` | `204` готово; `401`; `403`; `400`; `404` неизвестный получатель; `502` ошибка связи с получателем; `503` занят |
 
@@ -220,6 +221,8 @@
 | Класс | Роль |
 |---|---|
 | `JwtPlayerTokenValidator` | проверка подписи, срока, издателя, аудитории; результат `PlayerIdentity` |
+| `PlayerTokenService` | проверка личности через `IPlayerCredentialVerifier`, доступа к партии через `IPlayerGameAccess` и вызов `IPlayerTokenIssuer` |
+| `JwtPlayerTokenIssuer` | подпись игрового JWT с фиксированным сроком, идентификатором игрока и идентификатором партии |
 | `AuthenticatedMessageReceiver` | разбор, сверка игры токена, белый список, отправка |
 | `PlayerAuthorizationInterpreter`, `PlayerAuthorizationCommand` | проверка прав перед выполнением команды |
 | `PlayerCommandPermissions`, `PlayerItemPermissions` | какие команды и предметы доступны игроку |
