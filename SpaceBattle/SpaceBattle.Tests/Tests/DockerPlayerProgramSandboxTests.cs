@@ -64,6 +64,68 @@ public sealed class DockerPlayerProgramSandboxTests
     }
 
     [Fact]
+    public async Task Request_Cancelled_During_Create_Removes_The_Container_Without_Starting_It()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var process = new ContainerProcess((_, _) => throw new InvalidOperationException("Unexpected start."),
+            create: async (_, token) =>
+            {
+                cancellation.Cancel();
+                await Task.Yield();
+                token.ThrowIfCancellationRequested();
+                return (0, "created");
+            });
+        using var sandbox = new DockerPlayerProgramSandbox(process, Settings, Limits);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => sandbox.Run(Runtime, "source", Turn, cancellation.Token));
+
+        Assert.Equal(new[] { "create", "rm" }, process.Calls.Select(call => call[0]));
+        var create = process.Calls[0];
+        Assert.Equal(create[Array.IndexOf(create, "--name") + 1], process.Calls[1][^1]);
+    }
+
+    [Fact]
+    public async Task Create_Timeout_Attempts_Removal_Without_A_Confirmed_Container()
+    {
+        var process = new ContainerProcess((_, _) => throw new InvalidOperationException("Unexpected start."),
+            create: async (_, token) =>
+            {
+                await Task.Delay(System.Threading.Timeout.Infinite, token);
+                return (0, "created");
+            });
+        using var sandbox = new DockerPlayerProgramSandbox(
+            process, Settings with { ExecutionTimeout = TimeSpan.FromMilliseconds(100) }, Limits);
+
+        var error = await Assert.ThrowsAsync<PlayerProgramException>(() => sandbox.Run(Runtime, "source", Turn, default));
+
+        Assert.Contains("time limit", error.Message);
+        Assert.Equal(new[] { "create", "rm" }, process.Calls.Select(call => call[0]));
+        var create = process.Calls[0];
+        Assert.Equal(create[Array.IndexOf(create, "--name") + 1], process.Calls[1][^1]);
+    }
+
+    [Theory]
+    [InlineData(0, "", "Docker or the configured program image is unavailable.")]
+    [InlineData(0, "container-id", "The program container could not be removed.")]
+    [InlineData(1, "", "The program container could not be removed.")]
+    public async Task Failed_Create_And_Removal_Check_Absence_Before_Preserving_The_Original_Error(
+        int listExitCode, string listOutput, string expectedMessage)
+    {
+        var process = new ContainerProcess((_, _) => throw new InvalidOperationException("Unexpected start."),
+            removalExitCode: 1, create: (_, _) => Task.FromResult((125, "")),
+            listExitCode: listExitCode, listOutput: listOutput);
+        using var sandbox = new DockerPlayerProgramSandbox(process, Settings, Limits);
+
+        var error = await Assert.ThrowsAsync<ProgramSandboxUnavailableException>(() =>
+            sandbox.Run(Runtime, "source", Turn, default));
+
+        Assert.Equal(expectedMessage, error.Message);
+        Assert.Equal(new[] { "create", "rm", "container" }, process.Calls.Select(call => call[0]));
+        Assert.Equal(new[] { "container", "ls", "--all", "--quiet", "--filter", $"name=^/{process.Calls[1][^1]}$" },
+            process.Calls[2]);
+    }
+
+    [Fact]
     public async Task Nonzero_Exit_Invalid_Text_And_Docker_Error_Are_Reported()
     {
         var failed = new ContainerProcess((_, _) => Task.FromResult((1, "")));
@@ -102,7 +164,9 @@ public sealed class DockerPlayerProgramSandboxTests
     }
 
     private sealed class ContainerProcess(Func<string[], CancellationToken, Task<(int, string)>> execute,
-        int removalExitCode = 0, Exception? removalError = null) : IProgramProcess
+        int removalExitCode = 0, Exception? removalError = null,
+        Func<string[], CancellationToken, Task<(int, string)>>? create = null,
+        int listExitCode = 0, string listOutput = "") : IProgramProcess
     {
         private readonly System.Collections.Concurrent.ConcurrentQueue<string[]> _calls = new();
         public string[][] Calls => _calls.ToArray();
@@ -110,13 +174,16 @@ public sealed class DockerPlayerProgramSandboxTests
         public Task<(int ExitCode, string Output)> Run(string executable, IEnumerable<string> arguments, string input,
             int outputLimit, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var args = arguments.ToArray();
             _calls.Enqueue(args);
             return args[0] switch
             {
+                "create" when create is not null => create(args, cancellationToken),
                 "create" => Task.FromResult((0, "created")),
                 "rm" when removalError is not null => Task.FromException<(int, string)>(removalError),
                 "rm" => Task.FromResult((removalExitCode, "")),
+                "container" => Task.FromResult((listExitCode, listOutput)),
                 _ => execute(args, cancellationToken)
             };
         }

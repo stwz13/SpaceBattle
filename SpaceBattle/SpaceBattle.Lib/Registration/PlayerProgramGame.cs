@@ -27,7 +27,7 @@ public sealed class PlayerProgramGame(IServerApplication server, IBattleShipClas
             var store = Ioc.Resolve<IGameItemStorage>(GameItemStorageDependencies.Storage);
             var access = Ioc.Resolve<IAuthorizationPolicy>(AuthorizationDependencies.Policy);
             ships = store.GetSnapshot().Where(item => fleet.IsShip(item) && Property(item, "Destroyed") is not true &&
-                    access.IsAllowed(player.PlayerId, "Movement", item))
+                    access.IsAllowed(player.PlayerId, FleetPermissions.ReadShipState, item))
                 .Select(ReadShip).OrderBy(ship => ship.Id, StringComparer.Ordinal).ToArray();
         }).WaitAsync(cancellationToken);
 

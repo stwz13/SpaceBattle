@@ -86,6 +86,27 @@ public sealed class PlayerProgramsHttpTests
         await Invoke(outside, HttpStatusCode.NotFound);
     }
 
+    [Fact]
+    public async Task Ship_State_Can_Be_Read_Through_Http_Without_Movement_Permission()
+    {
+        await using var host = new Factory();
+        using var player = Player(host, "p1");
+        var server = host.Services.GetRequiredService<IServerApplication>();
+        var game = server.Runtime.Start(GameId);
+        await game.Execute(() =>
+            new RegisterIoCDependencyAuthorizedActions(new ReadAndRotatePolicy()).Execute()).WaitAsync(Timeout);
+        await CreateShip(player, "s1", "p1");
+        await game.Enqueue(() => { }).WaitAsync(Timeout);
+        await Upload(player, "python", "print('null')", HttpStatusCode.NoContent);
+
+        host.Engine.Output = "null";
+        await Invoke(player, HttpStatusCode.NoContent);
+
+        using var packet = JsonDocument.Parse(host.Engine.Input);
+        var ships = packet.RootElement.GetProperty("turn").GetProperty("ships").EnumerateArray();
+        Assert.Equal("s1", Assert.Single(ships).GetProperty("id").GetString());
+    }
+
     private static async Task Start(HttpClient first, HttpClient second)
     {
         var path = $"/games/{GameId}/rules";
@@ -159,6 +180,12 @@ public sealed class PlayerProgramsHttpTests
                     new PlayerAccessOptions { Commands = ["CreateItem", FleetOrderCommand.Name], Items = ["*"] })
             });
         });
+    }
+
+    private sealed class ReadAndRotatePolicy : IAuthorizationPolicy
+    {
+        public bool IsAllowed(string subject, string action, IGameItem target) =>
+            action is FleetPermissions.ReadShipState or "Rotation" && Equals(target.GetProperty("Owner"), subject);
     }
 
     private sealed class DockerDouble : IProgramProcess
