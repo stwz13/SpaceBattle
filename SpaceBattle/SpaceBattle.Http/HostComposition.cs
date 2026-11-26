@@ -8,6 +8,7 @@ public static class HostComposition
     public static void Configure(IServiceCollection services, IConfiguration configuration)
     {
         services.TryAddSingleton(_ => configuration.GetSection("Server").Get<ServerOptions>() ?? new ServerOptions());
+        PlayerTokenComposition.Configure(services, configuration);
         services.TryAddSingleton<GameRuleRooms>();
         PlayerProgramComposition.Configure(services, configuration);
         services.TryAddSingleton<IProjectileCollisionDetector, SegmentProjectileCollisionDetector>();

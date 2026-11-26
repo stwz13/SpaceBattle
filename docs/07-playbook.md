@@ -42,6 +42,93 @@ dotnet run --project SpaceBattle.Http -- --urls http://localhost:5000
 
 ## 2. Получить токен игрока и отправить сообщение
 
+### Получить токены двух игроков через HTTP
+
+`POST /auth/player-token` принимает JSON с полями `login`, `password` и `game`. При успехе сервер возвращает `accessToken`, `tokenType = "Bearer"` и `expiresIn = 300`. При неполном или некорректном запросе возвращается `400`, при неверных учётных данных — `401`, при отсутствии доступа к партии — `403`. Получить токен можно до создания лобби.
+
+Для локального запуска задайте две учётные записи, список доступных им партий и игровые права. Формат `PasswordHash` — Base64 от 16 байт случайной соли и 32 байт PBKDF2-HMAC-SHA256 с 600 000 итераций. Пример ниже запускается в PowerShell 7.4+ из корня репозитория. Введите разные тестовые пароли для Alice и Bob.
+
+```powershell
+function New-LocalPasswordHash([string]$Password) {
+    $salt = [System.Security.Cryptography.RandomNumberGenerator]::GetBytes(16)
+    $sha256 = [System.Security.Cryptography.HashAlgorithmName]::SHA256
+    $hash = [System.Security.Cryptography.Rfc2898DeriveBytes]::Pbkdf2($Password, $salt, 600000, $sha256, 32)
+    [Convert]::ToBase64String([byte[]]($salt + $hash))
+}
+
+$env:Server__JwtSecret = [Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+$env:Server__RestoreOnStart = 'false'
+$env:Server__SnapshotOnStop = 'false'
+
+$env:PlayerTokenIssuance__Accounts__alice__PlayerId = 'p1'
+$env:PlayerTokenIssuance__Accounts__alice__PasswordHash = New-LocalPasswordHash (Read-Host 'Пароль Alice' -MaskInput)
+$env:PlayerTokenIssuance__Accounts__bob__PlayerId = 'p2'
+$env:PlayerTokenIssuance__Accounts__bob__PasswordHash = New-LocalPasswordHash (Read-Host 'Пароль Bob' -MaskInput)
+$env:PlayerTokenIssuance__GamesByPlayer__p1__0 = 'local-jwt'
+$env:PlayerTokenIssuance__GamesByPlayer__p2__0 = 'local-jwt'
+
+$ships = @{ p1 = 's1'; p2 = 's2' }
+foreach ($player in $ships.Keys) {
+    [Environment]::SetEnvironmentVariable("Server__Players__${player}__Commands__0", 'CreateItem')
+    [Environment]::SetEnvironmentVariable("Server__Players__${player}__Commands__1", 'FleetOrder')
+    [Environment]::SetEnvironmentVariable("Server__Players__${player}__Items__0", $ships[$player])
+}
+
+dotnet run --project ./SpaceBattle/SpaceBattle.Http --no-launch-profile -- --urls http://127.0.0.1:5000
+```
+
+Во второй консоли PowerShell введите те же пароли. Получите токены, создайте лобби, запустите партию и отправьте приказ.
+
+```powershell
+$base = 'http://127.0.0.1:5000'
+$game = 'local-jwt'
+$rules = "/games/$game/rules"
+
+function Send-Json($Method, $Path, $Value, $Headers = @{}) {
+    Invoke-RestMethod -Method $Method -Uri "$base$Path" -Headers $Headers -ContentType 'application/json' `
+        -Body (ConvertTo-Json -InputObject $Value -Depth 8 -Compress)
+}
+
+$alice = Send-Json Post /auth/player-token @{
+    login = 'alice'; password = (Read-Host 'Пароль Alice' -MaskInput); game = $game
+}
+$bob = Send-Json Post /auth/player-token @{
+    login = 'bob'; password = (Read-Host 'Пароль Bob' -MaskInput); game = $game
+}
+$first = @{ Authorization = "Bearer $($alice.accessToken)" }
+$second = @{ Authorization = "Bearer $($bob.accessToken)" }
+
+Send-Json Post "$rules/lobby" @('p1', 'p2') $first
+$proposal = Send-Json Put $rules @{ parameters = @{ 'objects.Ship' = @{ turnSteps = 2 } } } $first
+$version = "$base$rules/$($proposal.revision)"
+Invoke-RestMethod -Method Post -Uri "$version/confirm" -Headers $first
+Invoke-RestMethod -Method Post -Uri "$version/confirm" -Headers $second
+Invoke-RestMethod -Method Post -Uri "$version/start" -Headers $first
+
+function New-ShipMessage($Id, $Owner) {
+    @{
+        gameId = $game; command = 'CreateItem'
+        args = @{
+            id = $Id; kind = 'Ship'
+            properties = @{
+                Owner = @{ type = 'string'; value = $Owner }
+                Position = @{ type = 'vector'; value = @(0, 0) }
+                Direction = @{ type = 'angle'; value = 0 }
+            }
+        }
+    }
+}
+
+Send-Json Post /messages (New-ShipMessage 's1' 'p1') $first
+Send-Json Post /messages (New-ShipMessage 's2' 'p2') $second
+Send-Json Post /messages @{ gameId = $game; command = 'FleetOrder'; args = @{ id = 's1'; action = 'Rotation' } } $first
+```
+
+Допуск к выдаче задаётся в `PlayerTokenIssuance:GamesByPlayer` по идентификатору игрока. Права команд и предметов задаются отдельно в `Server:Players`. `JwtIssuer` и `JwtAudience` можно оставить штатными. После истечения срока запросите новый токен тем же способом.
+
+<details>
+<summary>Исторический пример для версии до HTTP-выдачи</summary>
+
 Токен — JWT HS256 с `iss`/`aud` из настроек, обязательным сроком (`exp`) и утверждениями: `sub` (игрок), `game` (игра), необязательно `permission = transfer`. Сервиса выдачи токенов в проекте нет; для проверки токен можно создать так:
 
 ```csharp
@@ -62,7 +149,19 @@ curl -X POST http://localhost:5000/messages \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"gameId":"demo","command":"CreateItem","args":{"kind":"Ship","id":"s1","properties":{"Fuel":{"type":"int","value":10},"Owner":{"type":"string","value":"p1"}}}}'
 ```
+</details>
+
 Ответ `202` значит «принято в очередь игры», а не «выполнено». Чтобы команда прошла, она должна быть в `AllowedCommands`, у игрока в `Players.<id>.Commands`, а в `CommandTargets` — иметь поле с id предмета. Коды ошибок — [03-modules.md](03-modules.md) §3.18.
+
+Для явного задания начального состояния нового корабля используйте такой блок `args.properties` в `CreateItem`:
+
+```json
+{
+  "Fuel": { "type": "int", "value": 10 },
+  "Owner": { "type": "string", "value": "p1" },
+  "Destroyed": { "type": "bool", "value": false }
+}
+```
 
 ## 3. Собрать сервер в тесте или приложении
 
